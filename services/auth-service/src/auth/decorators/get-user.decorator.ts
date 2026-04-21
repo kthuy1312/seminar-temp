@@ -1,0 +1,20 @@
+import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { User } from '../../entities/user.entity';
+
+/**
+ * Custom decorator để lấy user từ request.
+ * Sử dụng: @GetUser() user: User
+ * Hoặc:    @GetUser('id') userId: string
+ */
+export const GetUser = createParamDecorator(
+  (data: keyof User | undefined, ctx: ExecutionContext) => {
+    const request = ctx.switchToHttp().getRequest();
+    const user = request.user as User;
+
+    if (data) {
+      return user[data];
+    }
+
+    return user;
+  },
+);
