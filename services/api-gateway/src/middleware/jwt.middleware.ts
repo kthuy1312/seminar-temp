@@ -35,7 +35,14 @@ export class JwtMiddleware implements NestMiddleware {
       const payload = jwt.verify(token, this.jwtSecret);
       // Gắn user info vào request để downstream service có thể dùng
       (req as any).user = payload;
-      this.logger.debug(`JWT verified for user: ${(payload as any).sub || (payload as any).id}`);
+
+      // Forward userId qua header để downstream service không cần decode JWT lại
+      const userId = (payload as any).sub || (payload as any).id;
+      if (userId) {
+        req.headers['x-user-id'] = userId;
+      }
+
+      this.logger.debug(`JWT verified for user: ${userId}`);
       next();
     } catch (error) {
       this.logger.warn(`JWT verification failed: ${error.message}`);
