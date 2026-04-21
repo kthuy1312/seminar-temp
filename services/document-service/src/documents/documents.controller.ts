@@ -4,76 +4,91 @@ import {
   Get,
   Param,
   Query,
-  Body,
-  UseInterceptors,
   UploadedFile,
-  BadRequestException,
-  Headers,
+  UseInterceptors,
+  ParseUUIDPipe,
   HttpCode,
   HttpStatus,
-  ParseUUIDPipe,
+  Body,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { diskStorage } from 'multer';
+import { extname, join } from 'path';
+import { v4 as uuidv4 } from 'uuid';
 import { DocumentsService } from './documents.service';
-import { UploadDocumentDto, QueryDocumentsDto } from './dto';
+import { QueryDocumentsDto } from './dto/document.dto';
 
-@Controller()
+// ─── Multer Config ───────────────────────────────────────────
+
+const storage = diskStorage({
+  destination: join(process.cwd(), 'uploads'), // Thư mục lưu file
+  filename: (_req, file, cb) => {
+    // Đặt tên file: uuid + extension gốc (tránh trùng)
+    const uniqueName = `${uuidv4()}${extname(file.originalname)}`;
+    cb(null, uniqueName);
+  },
+});
+
+const fileFilter = (_req: any, file: Express.Multer.File, cb: any) => {
+  const allowed = ['.pdf', '.docx', '.txt', '.pptx', '.xlsx'];
+  const ext = extname(file.originalname).toLowerCase();
+
+  if (allowed.includes(ext)) {
+    cb(null, true);
+  } else {
+    cb(new Error(`File ${ext} không được hỗ trợ`), false);
+  }
+};
+
+// ─── Controller ──────────────────────────────────────────────
+
+@Controller('documents')
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
 
   /**
    * POST /api/documents/upload
-   * Upload file PDF hoặc DOCX
-   * userId lấy từ header X-User-Id (do API Gateway forward)
+   * Upload file tài liệu (form-data)
+   *
+   * Form fields:
+   *   - file: binary file
+   *   - userId: string (UUID)
    */
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file'))
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage,
+      fileFilter,
+      limits: { fileSize: 10 * 1024 * 1024 }, // Max 10MB
+    }),
+  )
   async upload(
-    @Headers('x-user-id') userId: string,
     @UploadedFile() file: Express.Multer.File,
-    @Body() dto: UploadDocumentDto,
+    @Body('userId') userId: string,
   ) {
-    if (!userId) {
-      throw new BadRequestException('Missing X-User-Id header');
-    }
-
-    if (!file) {
-      throw new BadRequestException('File is required');
-    }
-
-    return this.documentsService.upload(userId, file, dto.title);
+    return this.documentsService.upload(file, userId);
   }
 
   /**
    * GET /api/documents
-   * Danh sách tài liệu của user (phân trang)
+   * Lấy danh sách documents (có filter)
+   *
+   * Query params:
+   *   - userId (optional)
+   *   - fileType (optional): pdf | docx | txt | pptx | xlsx
    */
   @Get()
-  async findAll(
-    @Headers('x-user-id') userId: string,
-    @Query() query: QueryDocumentsDto,
-  ) {
-    if (!userId) {
-      throw new BadRequestException('Missing X-User-Id header');
-    }
-
-    return this.documentsService.findAll(userId, query);
+  async findAll(@Query() query: QueryDocumentsDto) {
+    return this.documentsService.findAll(query);
   }
 
   /**
    * GET /api/documents/:id
-   * Chi tiết tài liệu theo ID
+   * Lấy chi tiết 1 document theo ID
    */
   @Get(':id')
-  async findOne(
-    @Headers('x-user-id') userId: string,
-    @Param('id', new ParseUUIDPipe()) id: string,
-  ) {
-    if (!userId) {
-      throw new BadRequestException('Missing X-User-Id header');
-    }
-
-    return this.documentsService.findOne(userId, id);
+  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+    return this.documentsService.findOne(id);
   }
 }

@@ -1,104 +1,96 @@
 import {
   Injectable,
-  Logger,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Document, FileType, DocumentStatus } from '../entities/document.entity';
-import { QueryDocumentsDto } from './dto';
-import * as path from 'path';
+import { PrismaService } from '../prisma/prisma.service';
+import { FileType } from '@prisma/client';
 
 @Injectable()
 export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
 
-  constructor(
-    @InjectRepository(Document)
-    private readonly documentRepo: Repository<Document>,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  /**
-   * Lưu metadata file đã upload vào database
-   */
-  async upload(
-    userId: string,
-    file: Express.Multer.File,
-    title?: string,
-  ): Promise<Document> {
-    // Xác định file type từ extension
-    const ext = path.extname(file.originalname).toLowerCase();
-    let fileType: FileType;
+  // ─── UPLOAD ────────────────────────────────────────────────
 
-    if (ext === '.pdf') {
-      fileType = FileType.PDF;
-    } else if (ext === '.docx') {
-      fileType = FileType.DOCX;
-    } else {
-      throw new BadRequestException(`Unsupported file type: ${ext}. Only .pdf and .docx are allowed.`);
+  async upload(file: Express.Multer.File, userId: string) {
+    if (!file) {
+      throw new BadRequestException('File không được để trống');
     }
 
-    const document = this.documentRepo.create({
-      userId,
-      title: title || path.parse(file.originalname).name, // Dùng tên file gốc nếu không có title
-      originalName: file.originalname,
-      fileName: file.filename,
-      filePath: file.path,
-      fileType,
-      fileSize: file.size,
-      mimeType: file.mimetype,
-      status: DocumentStatus.READY,
+    // Lấy extension và validate
+    const ext = file.originalname.split('.').pop()?.toLowerCase();
+    const allowedTypes = ['pdf', 'docx', 'txt', 'pptx', 'xlsx'];
+
+    if (!ext || !allowedTypes.includes(ext)) {
+      throw new BadRequestException(
+        `Định dạng file không hỗ trợ. Chỉ chấp nhận: ${allowedTypes.join(', ')}`,
+      );
+    }
+
+    // Lưu thông tin vào DB
+    const document = await this.prisma.document.create({
+      data: {
+        userId,
+        fileName: file.originalname,
+        fileType: ext as FileType,
+        filePath: file.path,         // Đường dẫn file trên server
+        fileSize: BigInt(file.size),
+      },
     });
 
-    const saved = await this.documentRepo.save(document);
-    this.logger.log(`Document uploaded: ${saved.id} by user ${userId}`);
+    this.logger.log(`Document uploaded: ${document.fileName} (${document.id})`);
 
-    return saved;
+    return this.serializeDocument(document);
   }
 
-  /**
-   * Lấy danh sách tài liệu của user (có phân trang)
-   */
-  async findAll(userId: string, query: QueryDocumentsDto) {
-    const page = parseInt(query.page || '1', 10);
-    const limit = Math.min(parseInt(query.limit || '10', 10), 50); // Max 50
-    const skip = (page - 1) * limit;
+  // ─── GET ALL ───────────────────────────────────────────────
 
-    const where: any = { userId };
+  async findAll(query: { userId?: string; fileType?: string }) {
+    const where: any = {};
+
+    if (query.userId) {
+      where.userId = query.userId;
+    }
 
     if (query.fileType) {
-      where.fileType = query.fileType;
+      where.fileType = query.fileType as FileType;
     }
 
-    const [data, total] = await this.documentRepo.findAndCount({
+    const documents = await this.prisma.document.findMany({
       where,
-      order: { createdAt: 'DESC' },
-      skip,
-      take: limit,
+      orderBy: { uploadedAt: 'desc' },
     });
 
-    return {
-      data,
-      total,
-      page,
-      limit,
-      totalPages: Math.ceil(total / limit),
-    };
+    return documents.map((doc) => this.serializeDocument(doc));
   }
 
-  /**
-   * Lấy chi tiết document theo ID (kiểm tra ownership)
-   */
-  async findOne(userId: string, id: string): Promise<Document> {
-    const document = await this.documentRepo.findOne({
-      where: { id, userId },
+  // ─── GET BY ID ─────────────────────────────────────────────
+
+  async findOne(id: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id },
     });
 
     if (!document) {
-      throw new NotFoundException(`Document ${id} not found`);
+      throw new NotFoundException(`Document với id "${id}" không tồn tại`);
     }
 
-    return document;
+    return this.serializeDocument(document);
+  }
+
+  // ─── HELPER ────────────────────────────────────────────────
+
+  /**
+   * Prisma trả BigInt cho fileSize, cần convert sang number/string
+   * để JSON.stringify không lỗi
+   */
+  private serializeDocument(doc: any) {
+    return {
+      ...doc,
+      fileSize: Number(doc.fileSize),
+    };
   }
 }

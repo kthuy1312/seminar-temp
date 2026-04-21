@@ -1,16 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
-import { HttpExceptionFilter } from './common/filters/http-exception.filter';
-import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // Global prefix
-  app.setGlobalPrefix('api/documents');
+  app.setGlobalPrefix('api');
 
-  // Global validation pipe
+  // Validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -19,17 +17,8 @@ async function bootstrap() {
     }),
   );
 
-  // Global exception filter
-  app.useGlobalFilters(new HttpExceptionFilter());
-
-  // Global response transform
-  app.useGlobalInterceptors(new TransformInterceptor());
-
   // CORS
-  app.enableCors({
-    origin: process.env.CORS_ORIGIN || '*',
-    credentials: true,
-  });
+  app.enableCors({ origin: '*', credentials: true });
 
   const port = process.env.PORT || 3004;
   await app.listen(port);
