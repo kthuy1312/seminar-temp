@@ -1,0 +1,40 @@
+// ============================================================
+// Prisma Schema — Document Service
+// File: services/document-service/prisma/schema.prisma
+// ============================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUM ────────────────────────────────────────────────────
+
+enum FileType {
+  pdf
+  docx
+  txt
+  pptx
+  xlsx
+}
+
+// ─── DOCUMENT ────────────────────────────────────────────────
+
+model Document {
+  id         String   @id @default(uuid()) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  fileName   String   @map("file_name") @db.VarChar(255)
+  fileType   FileType @map("file_type")
+  filePath   String   @map("file_path") @db.Text
+  fileSize   BigInt   @map("file_size")            // bytes
+  uploadedAt DateTime @default(now()) @map("uploaded_at")
+
+  // Indexes
+  @@index([userId])
+  @@index([fileType])
+  @@index([uploadedAt])
+  @@map("documents")
+}
