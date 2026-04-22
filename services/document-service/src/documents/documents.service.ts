@@ -1,10 +1,12 @@
 import {
   Injectable,
+  Inject,
   NotFoundException,
   BadRequestException,
   Logger,
   InternalServerErrorException,
 } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
 import { FileType } from '@prisma/client';
 import { FileTypeEnum, QueryDocumentsDto } from './dto/document.dto';
@@ -24,6 +26,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly textExtractor: TextExtractorService,
+    @Inject('RABBITMQ_CLIENT') private readonly rabbitClient: ClientProxy,
   ) {}
 
   // ─── UPLOAD ────────────────────────────────────────────────
@@ -77,6 +80,13 @@ export class DocumentsService {
       this.logger.log(
         `Document uploaded: ${document.fileName} (id=${document.id}, size=${file.size}B)`,
       );
+
+      // ─── PUBLISH RABBITMQ EVENT ───
+      this.rabbitClient.emit('document.uploaded', {
+        document_id: document.id,
+        extracted_text: extractedText,
+      });
+      this.logger.log(`Published event 'document.uploaded' for document: ${document.id}`);
 
       return this.serializeDocument(document, file.filename);
     } catch (err: unknown) {
