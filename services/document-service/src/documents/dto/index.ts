@@ -1,2 +1,9 @@
-export { UploadDocumentDto } from './upload-document.dto';
-export { QueryDocumentsDto } from './query-documents.dto';
+// Tất cả exports dùng chung từ document.dto.ts
+export {
+  FileTypeEnum,
+  ALLOWED_EXTENSIONS,
+  ALLOWED_MIME_TYPES,
+  MAX_FILE_SIZE_BYTES,
+  UploadDocumentDto,
+  QueryDocumentsDto,
+} from './document.dto';

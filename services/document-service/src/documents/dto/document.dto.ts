@@ -1,16 +1,24 @@
-import { IsOptional, IsString, IsEnum } from 'class-validator';
+import { IsOptional, IsString, IsUUID, IsEnum } from 'class-validator';
 
+// ─── Chỉ cho phép PDF và DOCX ─────────────────────────────────
 export enum FileTypeEnum {
   PDF = 'pdf',
   DOCX = 'docx',
-  TXT = 'txt',
-  PPTX = 'pptx',
-  XLSX = 'xlsx',
 }
 
+export const ALLOWED_MIME_TYPES: Record<FileTypeEnum, string> = {
+  [FileTypeEnum.PDF]: 'application/pdf',
+  [FileTypeEnum.DOCX]: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+export const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
+export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+
+// ─── DTOs ─────────────────────────────────────────────────────
+
 export class UploadDocumentDto {
-  @IsString()
   @IsOptional()
+  @IsUUID('4', { message: 'userId phải là UUID hợp lệ' })
   userId?: string; // Thực tế sẽ lấy từ JWT, để optional cho demo
 }
 
@@ -20,6 +28,6 @@ export class QueryDocumentsDto {
   userId?: string;
 
   @IsOptional()
-  @IsEnum(FileTypeEnum, { message: 'fileType phải là: pdf, docx, txt, pptx, xlsx' })
+  @IsEnum(FileTypeEnum, { message: 'fileType phải là: pdf, docx' })
   fileType?: FileTypeEnum;
 }
