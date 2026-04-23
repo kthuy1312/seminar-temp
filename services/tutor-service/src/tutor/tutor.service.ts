@@ -94,7 +94,8 @@ export class TutorService {
         this.httpService.get(`${summaryServiceUrl}/summaries/${documentId}`)
       );
       // Assuming the response structure contains the text summary
-      return response.data?.summary || response.data?.content || JSON.stringify(response.data);
+      const summary = response.data?.summary || response.data?.content;
+      return summary ? summary : null;
     } catch (error) {
       this.logger.error(`Failed to fetch summary from Summary Service: ${error.message}`);
       return null;
