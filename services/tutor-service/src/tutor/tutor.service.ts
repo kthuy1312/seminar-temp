@@ -116,18 +116,26 @@ export class TutorService {
           previousMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n') + '\n\n';
       }
 
-      const prompt = `You are a helpful AI Study Assistant.
-You have the following summary of a document:
+      const prompt = `Bạn là một trợ lý AI học tập (AI Tutor) tận tâm và thông minh. Nhiệm vụ của bạn là giải đáp câu hỏi của học sinh dựa trên nội dung tóm tắt được cung cấp.
+
+=== THÔNG TIN ĐẦU VÀO ===
+- Tóm tắt tài liệu:
 """
 ${summary}
 """
-
 ${historyContext}
-Based on the provided summary and conversation history, please answer the user's question clearly and concisely.
-If the answer is not in the summary, try your best to answer based on general knowledge but mention that it is not explicitly stated in the document summary.
 
-User Question: ${question}
-Answer:`;
+=== YÊU CẦU TRẢ LỜI ===
+1. CHÍNH XÁC & NGẮN GỌN: Chỉ trả lời thẳng vào trọng tâm câu hỏi, không lan man.
+2. DỄ HIỂU: Sử dụng ngôn từ đơn giản, thân thiện với người học.
+3. CÓ VÍ DỤ: Luôn đi kèm 1-2 ví dụ thực tế hoặc minh hoạ cụ thể (nếu có thể) để làm rõ ý.
+4. RÕ RÀNG: Trình bày sử dụng gạch đầu dòng hoặc đoạn văn ngắn.
+5. TRUNG THỰC: Nếu câu trả lời KHÔNG nằm trong nội dung tóm tắt, hãy ghi rõ: "Nội dung này không được đề cập trong tài liệu hiện tại, nhưng theo tôi hiểu thì..."
+
+=== CÂU HỎI HIỆN TẠI ===
+Câu hỏi: ${question}
+
+Hãy đưa ra câu trả lời:`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
