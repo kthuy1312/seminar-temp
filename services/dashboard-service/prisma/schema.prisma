@@ -1,0 +1,48 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserStats {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @unique @map("user_id") @db.Uuid
+  totalGoals     Int      @default(0) @map("total_goals")
+  completedGoals Int      @default(0) @map("completed_goals")
+  totalDocuments Int      @default(0) @map("total_documents")
+  totalQuizzes   Int      @default(0) @map("total_quizzes")
+  avgQuizScore   Decimal  @default(0.00) @db.Decimal(5, 2) @map("avg_quiz_score")
+  studyStreak    Int      @default(0) @map("study_streak")
+  lastActive     DateTime? @map("last_active")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@index([updatedAt])
+  @@map("user_stats")
+}
+
+model QuizMetric {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  quizId    String   @unique @map("quiz_id") @db.Uuid
+  score     Decimal  @db.Decimal(5, 2)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@map("quiz_metrics")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  action    String   @db.VarChar(50)
+  metadata  Json?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([action])
+  @@map("activity_log")
+}
