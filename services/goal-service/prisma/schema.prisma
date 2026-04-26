@@ -1,0 +1,42 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "windows"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Goal {
+  id          String      @id @default(uuid()) @db.Uuid
+  user_id     String      @db.Uuid
+  title       String      @db.VarChar(255)
+  description String?     @db.Text
+  category    String?     @db.VarChar(50)
+  status      String      @default("active") @db.VarChar(20) // active | completed | paused
+  target_date DateTime?   @db.Date
+  progress    Int         @default(0) // 0-100 percentage
+  created_at  DateTime    @default(now()) @db.Timestamp(6)
+  updated_at  DateTime    @default(now()) @updatedAt @db.Timestamp(6)
+  
+  milestones  Milestone[]
+
+  @@index([user_id])
+  @@index([status])
+  @@map("goals")
+}
+
+model Milestone {
+  id          String   @id @default(uuid()) @db.Uuid
+  goal_id     String   @db.Uuid
+  title       String   @db.VarChar(255)
+  is_done     Boolean  @default(false)
+  due_date    DateTime? @db.Date
+  created_at  DateTime @default(now()) @db.Timestamp(6)
+  updated_at  DateTime @default(now()) @updatedAt @db.Timestamp(6)
+  
+  goal        Goal     @relation(fields: [goal_id], references: [id], onDelete: Cascade)
+
+  @@index([goal_id])
+  @@map("milestones")
+}
