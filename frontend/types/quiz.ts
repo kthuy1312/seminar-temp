@@ -1,0 +1,11 @@
+export type QuizQuestion = {
+  id: string;
+  questionText: string;
+  options: string[];
+};
+
+export type QuizItem = {
+  id: string;
+  documentId: string;
+  questions: QuizQuestion[];
+};

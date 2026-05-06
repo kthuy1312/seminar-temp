@@ -1,32 +1,62 @@
-import Link from "next/link";
+"use client";
 
-type Task = {
-  id: number;
-  subject: string;
-  topic: string;
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+
+import { getDashboardOverview, getRecentActivities } from "@/lib/api/dashboard.api";
+import { DashboardOverview } from "@/types/dashboard";
+
+const defaultOverview: DashboardOverview = {
+  progressPercent: 0,
+  stats: [],
+  nextTasks: [],
+  suggestions: [],
 };
 
-const progressPercent = 40;
-
-const nextTasks: Task[] = [
-  { id: 1, subject: "Math", topic: "Algebra basics" },
-  { id: 2, subject: "Physics", topic: "Motion" },
-  { id: 3, subject: "Chemistry", topic: "Atomic structure" },
-];
-
-const aiSuggestions = [
-  "You should review Algebra basics today.",
-  "Focus more on Physics this week.",
-  "Take a short quiz after each study session.",
-];
-
-const studyStats = [
-  { label: "Hours studied", value: "10" },
-  { label: "Tasks completed", value: "5" },
-  { label: "Current streak", value: "3 days" },
-];
-
 export default function DashboardPage() {
+  const [data, setData] = useState<DashboardOverview>(defaultOverview);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDashboard = async () => {
+      try {
+        const [overview, activities] = await Promise.all([
+          getDashboardOverview(),
+          getRecentActivities(),
+        ]);
+
+        const nextTasks = activities.slice(0, 3).map((item) => ({
+          id: item.id,
+          subject: "Activity",
+          topic: item.action,
+        }));
+
+        setData({
+          ...overview,
+          nextTasks,
+          suggestions: nextTasks.length
+            ? nextTasks.map((task) => `Keep progress on: ${task.topic}`)
+            : ["No AI suggestion yet."],
+        });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Cannot load dashboard");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadDashboard();
+  }, []);
+
+  const isEmpty = useMemo(
+    () =>
+      data.stats.length === 0 &&
+      data.nextTasks.length === 0 &&
+      data.suggestions.length === 0,
+    [data]
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
@@ -47,9 +77,7 @@ export default function DashboardPage() {
               <h2 className="text-base font-semibold text-slate-900">
                 Progress
               </h2>
-              <p className="mt-1 text-sm text-slate-600">
-                {progressPercent}% completed
-              </p>
+              <p className="mt-1 text-sm text-slate-600">{data.progressPercent}% completed</p>
             </div>
             <Link
               href="/roadmap"
@@ -61,7 +89,7 @@ export default function DashboardPage() {
           <div className="mt-4 h-2.5 w-full rounded-full bg-slate-100">
             <div
               className="h-2.5 rounded-full bg-blue-500"
-              style={{ width: `${progressPercent}%` }}
+              style={{ width: `${data.progressPercent}%` }}
             />
           </div>
           <div className="mt-5 flex flex-wrap gap-2">
@@ -89,7 +117,7 @@ export default function DashboardPage() {
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Study Stats</h2>
           <div className="mt-4 space-y-3">
-            {studyStats.map((stat) => (
+            {data.stats.map((stat) => (
               <div
                 key={stat.label}
                 className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
@@ -113,7 +141,7 @@ export default function DashboardPage() {
           </div>
 
           <ul className="mt-4 space-y-3">
-            {nextTasks.map((task) => (
+            {data.nextTasks.map((task) => (
               <li key={task.id}>
                 <Link
                   href="/roadmap"
@@ -132,7 +160,7 @@ export default function DashboardPage() {
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">AI Suggestions</h2>
           <ul className="mt-4 space-y-3">
-            {aiSuggestions.map((suggestion) => (
+            {data.suggestions.map((suggestion) => (
               <li
                 key={suggestion}
                 className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700"
@@ -149,6 +177,24 @@ export default function DashboardPage() {
           </Link>
         </article>
       </div>
+
+      {loading && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          Loading dashboard...
+        </section>
+      )}
+
+      {error && (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+          {error}
+        </section>
+      )}
+
+      {!loading && !error && isEmpty && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          No dashboard data yet.
+        </section>
+      )}
     </div>
   );
 }

@@ -2,6 +2,8 @@
 
 import { FormEvent, useEffect, useRef, useState } from "react";
 
+import { sendTutorMessage } from "@/lib/api/tutor.api";
+
 type MessageRole = "user" | "ai";
 
 type Message = {
@@ -51,15 +53,32 @@ export default function TutorPage() {
     setInput("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      const aiMessage: Message = {
-        id: Date.now() + 1,
-        role: "ai",
-        content: "Here is a simple explanation for your question...",
-      };
-      setMessages((prev) => [...prev, aiMessage]);
-      setIsLoading(false);
-    }, 1400);
+    sendTutorMessage({
+      question: trimmed,
+      documentId: "00000000-0000-0000-0000-000000000001",
+    })
+      .then((response) => {
+        const aiMessage: Message = {
+          id: Date.now() + 1,
+          role: "ai",
+          content: response.answer,
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      })
+      .catch((error) => {
+        const aiMessage: Message = {
+          id: Date.now() + 1,
+          role: "ai",
+          content:
+            error instanceof Error
+              ? `Service error: ${error.message}`
+              : "Service error. Please try again.",
+        };
+        setMessages((prev) => [...prev, aiMessage]);
+      })
+      .finally(() => {
+        setIsLoading(false);
+      });
   };
 
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {

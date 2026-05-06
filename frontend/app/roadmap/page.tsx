@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+
+import { getGoals, updateGoal } from "@/lib/api/goal.api";
 
 type Priority = "High" | "Medium" | "Low";
 type Status = "Todo" | "In Progress" | "Done";
@@ -13,65 +15,6 @@ type RoadmapItem = {
   priority: Priority;
   status: Status;
 };
-
-const initialRoadmap: RoadmapItem[] = [
-  {
-    day: 1,
-    subject: "Math",
-    topic: "Algebra basics",
-    duration: "2h",
-    priority: "High",
-    status: "Todo",
-  },
-  {
-    day: 2,
-    subject: "Physics",
-    topic: "Kinematics fundamentals",
-    duration: "1.5h",
-    priority: "High",
-    status: "Todo",
-  },
-  {
-    day: 3,
-    subject: "Chemistry",
-    topic: "Atomic structure and bonding",
-    duration: "2h",
-    priority: "Medium",
-    status: "Todo",
-  },
-  {
-    day: 4,
-    subject: "Math",
-    topic: "Linear equations practice",
-    duration: "1.5h",
-    priority: "Medium",
-    status: "Todo",
-  },
-  {
-    day: 5,
-    subject: "Physics",
-    topic: "Forces and Newton's laws",
-    duration: "2h",
-    priority: "High",
-    status: "Todo",
-  },
-  {
-    day: 6,
-    subject: "Chemistry",
-    topic: "Mole concept exercises",
-    duration: "1h",
-    priority: "Low",
-    status: "Todo",
-  },
-  {
-    day: 7,
-    subject: "Mixed Review",
-    topic: "Weekly recap and mini quiz",
-    duration: "2h",
-    priority: "Low",
-    status: "Todo",
-  },
-];
 
 const priorityClassMap: Record<Priority, string> = {
   High: "bg-orange-100 text-orange-700 border-orange-200",
@@ -86,8 +29,37 @@ const statusClassMap: Record<Status, string> = {
 };
 
 export default function RoadmapPage() {
-  const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>(initialRoadmap);
-  const currentDay = 3;
+  const [roadmapItems, setRoadmapItems] = useState<RoadmapItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const currentDay = 1;
+
+  useEffect(() => {
+    const loadRoadmap = async () => {
+      try {
+        const goals = await getGoals();
+        const mapped = goals.map((goal, index) => ({
+          day: index + 1,
+          subject: goal.category || "General",
+          topic: goal.title,
+          duration: "1h",
+          priority: "Medium" as Priority,
+          status:
+            goal.status === "completed"
+              ? ("Done" as Status)
+              : goal.status === "active"
+                ? ("In Progress" as Status)
+                : ("Todo" as Status),
+        }));
+        setRoadmapItems(mapped);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Cannot load roadmap");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadRoadmap();
+  }, []);
 
   const completedCount = useMemo(
     () => roadmapItems.filter((item) => item.status === "Done").length,
@@ -99,10 +71,23 @@ export default function RoadmapPage() {
     return Math.round((completedCount / roadmapItems.length) * 100);
   }, [completedCount, roadmapItems.length]);
 
-  const updateStatus = (day: number, status: Status) => {
-    setRoadmapItems((prev) =>
-      prev.map((item) => (item.day === day ? { ...item, status } : item))
-    );
+  const updateStatus = async (day: number, status: Status) => {
+    const target = roadmapItems.find((item) => item.day === day);
+    if (!target) return;
+
+    setRoadmapItems((prev) => prev.map((item) => (item.day === day ? { ...item, status } : item)));
+
+    try {
+      const goals = await getGoals();
+      const goal = goals[day - 1];
+      if (goal) {
+        await updateGoal(goal.id, {
+          status: status === "Done" ? "completed" : status === "In Progress" ? "active" : "paused",
+        });
+      }
+    } catch {
+      // Keep optimistic UI state to avoid disrupting study flow.
+    }
   };
 
   return (
@@ -207,7 +192,22 @@ export default function RoadmapPage() {
             </article>
           );
         })}
+        {!loading && roadmapItems.length === 0 && (
+          <article className="rounded-xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+            No roadmap items yet.
+          </article>
+        )}
       </section>
+      {loading && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          Loading roadmap...
+        </section>
+      )}
+      {error && (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+          {error}
+        </section>
+      )}
     </div>
   );
 }

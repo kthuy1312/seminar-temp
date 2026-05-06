@@ -3,6 +3,8 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { createGoal } from "@/lib/api/goal.api";
+
 const levels = ["Beginner", "Intermediate", "Advanced"] as const;
 const durations = ["7 days", "1 month", "3 months"] as const;
 const subjects = ["Math", "Physics", "Chemistry"] as const;
@@ -16,6 +18,7 @@ export default function GoalsPage() {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   const isFormValid = useMemo(() => {
     return (
@@ -42,8 +45,19 @@ export default function GoalsPage() {
     if (!isFormValid) return;
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 1200));
-    router.push("/roadmap");
+    setSubmitError(null);
+    try {
+      await createGoal({
+        title: targetScore,
+        description: `Level: ${level}, Hours/day: ${hoursPerDay}, Subjects: ${selectedSubjects.join(", ")}`,
+        category: selectedSubjects[0],
+      });
+      router.push("/roadmap");
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Create goal failed");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -198,6 +212,7 @@ export default function GoalsPage() {
           >
             {isSubmitting ? "Generating Study Plan..." : "Generate Study Plan"}
           </button>
+          {submitError && <p className="text-sm text-red-600">{submitError}</p>}
         </form>
       </section>
     </div>

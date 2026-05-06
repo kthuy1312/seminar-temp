@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { LoggingMiddleware } from './middleware/logging.middleware';
 import { AuthProxyModule } from './proxy/auth-proxy.module';
 import { DocumentProxyModule } from './proxy/document-proxy.module';
+import { LearningProxyModule } from './proxy/learning-proxy.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { DocumentProxyModule } from './proxy/document-proxy.module';
     // Proxy modules
     AuthProxyModule,
     DocumentProxyModule,
+    LearningProxyModule,
   ],
 })
 export class AppModule implements NestModule {

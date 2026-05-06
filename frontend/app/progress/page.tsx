@@ -9,21 +9,52 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useEffect, useMemo, useState } from "react";
 
-const chartData = [
-  { day: "Mon", hours: 2 },
-  { day: "Tue", hours: 3 },
-  { day: "Wed", hours: 1 },
-  { day: "Thu", hours: 4 },
-  { day: "Fri", hours: 2 },
-];
+import { getDashboardOverview, getDashboardProgress } from "@/lib/api/dashboard.api";
 
-const completion = 60;
-const streakDays = 4;
-const tasksDone = 8;
-const totalHours = chartData.reduce((sum, item) => sum + item.hours, 0);
+const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export default function ProgressPage() {
+  const [chartData, setChartData] = useState<Array<{ day: string; hours: number }>>([]);
+  const [completion, setCompletion] = useState(0);
+  const [streakDays, setStreakDays] = useState(0);
+  const [tasksDone, setTasksDone] = useState(0);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadProgress = async () => {
+      try {
+        const [overview, progress] = await Promise.all([
+          getDashboardOverview(),
+          getDashboardProgress(),
+        ]);
+
+        setCompletion(overview.progressPercent);
+        setTasksDone(Number(overview.stats.find((item) => item.label === "Tasks completed")?.value || 0));
+        setStreakDays(Number((overview.stats.find((item) => item.label === "Current streak")?.value || "0").split(" ")[0]));
+        setChartData(
+          progress.map((item) => ({
+            day: weekDays[new Date(item.date).getDay()] || "N/A",
+            hours: item.completedGoals,
+          }))
+        );
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Cannot load progress");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProgress();
+  }, []);
+
+  const totalHours = useMemo(
+    () => chartData.reduce((sum, item) => sum + item.hours, 0),
+    [chartData]
+  );
+
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
@@ -65,6 +96,9 @@ export default function ProgressPage() {
               </ResponsiveContainer>
             </div>
           </div>
+          {!loading && chartData.length === 0 && (
+            <p className="mt-3 text-sm text-slate-500">No progress data yet.</p>
+          )}
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -105,6 +139,16 @@ export default function ProgressPage() {
           </div>
         </article>
       </div>
+      {loading && (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+          Loading progress...
+        </section>
+      )}
+      {error && (
+        <section className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 shadow-sm">
+          {error}
+        </section>
+      )}
     </div>
   );
 }
