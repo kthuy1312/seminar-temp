@@ -23,7 +23,11 @@ export class SummaryService {
     if (!textToSummarize) {
       this.logger.log(`No extracted text in payload, calling Document Service to extract for ${document_id}`);
       try {
-        const response = await axios.post(`http://localhost:3004/api/documents/${document_id}/extract`);
+        const documentServiceUrl =
+          process.env.DOCUMENT_SERVICE_URL || 'http://localhost:3003';
+        const response = await axios.post(
+          `${documentServiceUrl}/api/documents/${document_id}/extract`,
+        );
         if (response.data?.data?.text) {
           textToSummarize = response.data.data.text;
         } else {

@@ -13,6 +13,10 @@ export class AiService {
   }
 
   async summarizeText(text: string): Promise<string> {
+    if (!this.configService.get<string>('GEMINI_API_KEY')) {
+      return this.buildFallbackSummary(text);
+    }
+
     const maxRetries = 3;
     const timeoutMs = 15000;
     const prompt = `Bạn là một trợ lý AI học tập xuất sắc. Hãy tóm tắt nội dung tài liệu sau đây thành đúng 5 ý chính. Trình bày bằng tiếng Việt, dưới dạng danh sách gạch đầu dòng:\n\n${text}`;
@@ -65,5 +69,19 @@ export class AiService {
     }
     
     throw new Error('Failed to summarize text after retries');
+  }
+
+  private buildFallbackSummary(text: string): string {
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    const chunks = normalized
+      .split(/(?<=[.!?])\s+/)
+      .filter(Boolean)
+      .slice(0, 5);
+
+    if (chunks.length === 0) {
+      return '- Tai lieu chua co noi dung de tom tat.';
+    }
+
+    return chunks.map((chunk) => `- ${chunk}`).join('\n');
   }
 }

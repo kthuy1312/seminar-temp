@@ -12,6 +12,7 @@ import {
   Body,
   BadRequestException,
   UnsupportedMediaTypeException,
+  Headers,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -96,6 +97,7 @@ export class DocumentsController {
   async upload(
     @UploadedFile() file: Express.Multer.File | undefined,
     @Body() body: UploadDocumentDto,
+    @Headers('x-user-id') headerUserId?: string,
   ) {
     // Multer không throw khi fileFilter reject — nó chỉ bỏ qua file.
     // Nếu fileFilter reject, file sẽ là undefined.
@@ -105,7 +107,7 @@ export class DocumentsController {
       );
     }
 
-    return this.documentsService.upload(file, body.userId);
+    return this.documentsService.upload(file, body.userId || headerUserId);
   }
 
   /**
@@ -131,8 +133,14 @@ export class DocumentsController {
    *   fileType — optional — "pdf" | "docx"
    */
   @Get()
-  async findAll(@Query() query: QueryDocumentsDto) {
-    return this.documentsService.findAll(query);
+  async findAll(
+    @Query() query: QueryDocumentsDto,
+    @Headers('x-user-id') headerUserId?: string,
+  ) {
+    return this.documentsService.findAll({
+      ...query,
+      userId: query.userId || headerUserId,
+    });
   }
 
   /**

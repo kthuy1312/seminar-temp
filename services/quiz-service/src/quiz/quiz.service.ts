@@ -20,7 +20,9 @@ export class QuizService {
     // 1. Fetch summary from Summary Service
     let summaryText = '';
     try {
-      const summaryServiceUrl = this.configService.get<string>('SUMMARY_SERVICE_URL') || 'http://localhost:3002';
+      const summaryServiceUrl =
+        this.configService.get<string>('SUMMARY_SERVICE_URL') ||
+        'http://localhost:3006';
       const response = await axios.get(`${summaryServiceUrl}/api/summaries/document/${documentId}`);
       
       if (response.data && response.data.success && response.data.data && response.data.data.content) {

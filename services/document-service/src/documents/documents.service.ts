@@ -8,7 +8,6 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
-import { FileType } from '@prisma/client';
 import { FileTypeEnum, QueryDocumentsDto } from './dto/document.dto';
 import { extname } from 'path';
 import { TextExtractorService, ExtractResult } from './text-extractor.service';
@@ -70,7 +69,7 @@ export class DocumentsService {
         data: {
           userId: userId ?? null,
           fileName: file.originalname,
-          fileType: ext as unknown as FileType,
+          fileType: ext,
           filePath: file.path,
           fileSize: BigInt(file.size),
           extractedText, // Lưu text vào CSDL
@@ -107,7 +106,7 @@ export class DocumentsService {
     }
 
     if (query.fileType) {
-      where['fileType'] = query.fileType as unknown as FileType;
+      where['fileType'] = query.fileType;
     }
 
     const documents = await this.prisma.document.findMany({
@@ -170,7 +169,7 @@ export class DocumentsService {
    */
   private serializeDocument(doc: any, storedFilename?: string) {
     const filename = storedFilename ?? doc.filePath?.split(/[\\/]/).pop() ?? '';
-    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3004';
+    const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
 
     return {
       id: doc.id,

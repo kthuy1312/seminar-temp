@@ -5,6 +5,15 @@ import { ValidationPipe } from '@nestjs/common';
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
-  await app.listen(process.env.PORT ?? 3004);
+  
+  // Enable CORS
+  app.enableCors({
+    origin: '*',
+    credentials: false,
+  });
+
+  const port = process.env.PORT || 3007;
+  await app.listen(port);
+  console.log(`🎓 Tutor Service is running on http://localhost:${port}`);
 }
 bootstrap();

@@ -7,6 +7,12 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   const app = await NestFactory.create(AppModule);
 
+  // Enable CORS
+  app.enableCors({
+    origin: '*',
+    credentials: false,
+  });
+
   // Configure RabbitMQ Microservice ONLY if enabled
   if (process.env.ENABLE_RABBITMQ === 'true') {
     app.connectMicroservice<MicroserviceOptions>({
@@ -27,7 +33,7 @@ async function bootstrap() {
     logger.warn('RabbitMQ is DISABLED. Event-based summarization will not work.');
   }
 
-  const port = process.env.PORT || 3005;
+  const port = process.env.PORT || 3006;
   await app.listen(port);
   logger.log(`Summary Service is running on http://localhost:${port}`);
 }

@@ -9,7 +9,10 @@ const logging_interceptor_1 = require("./common/interceptors/logging.interceptor
 async function bootstrap() {
     const app = await core_1.NestFactory.create(app_module_1.AppModule);
     const logger = new common_1.Logger('Bootstrap');
-    app.enableCors();
+    app.enableCors({
+        origin: '*',
+        credentials: false,
+    });
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
         forbidNonWhitelisted: true,
@@ -42,7 +45,7 @@ async function bootstrap() {
             displayOperationId: true,
         },
     });
-    const port = process.env.PORT ?? 3002;
+    const port = process.env.PORT ?? 3004;
     await app.listen(port);
     logger.log(`🚀 Goal Service listening on port ${port}`);
     logger.log(`📚 Swagger documentation available at http://localhost:${port}/docs`);

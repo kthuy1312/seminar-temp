@@ -89,22 +89,27 @@ export class TutorService {
 
   private async getSummaryFromService(documentId: string): Promise<string | null> {
     try {
-      const summaryServiceUrl = this.configService.get<string>('SUMMARY_SERVICE_URL', 'http://localhost:3002');
-      const response = await firstValueFrom(
-        this.httpService.get(`${summaryServiceUrl}/summaries/${documentId}`)
+      const summaryServiceUrl = this.configService.get<string>(
+        'SUMMARY_SERVICE_URL',
+        'http://localhost:3006',
       );
-      // Assuming the response structure contains the text summary
-      const summary = response.data?.summary || response.data?.content;
+      const response = await firstValueFrom(
+        this.httpService.get(`${summaryServiceUrl}/api/summaries/document/${documentId}`),
+      );
+      const summary =
+        response.data?.data?.content ||
+        response.data?.summary ||
+        response.data?.content;
       return summary ? summary : null;
     } catch (error) {
       this.logger.error(`Failed to fetch summary from Summary Service: ${error.message}`);
-      return null;
+      return `Tai lieu tham chieu cho document ${documentId} hien chua co ban tom tat. Hay tra loi dua tren kien thuc hoc tap tong quat va noi ro khi thong tin khong co trong tai lieu.`;
     }
   }
 
   private async generateAnswer(question: string, summary: string, previousMessages: any[]): Promise<string> {
     if (!this.genAI) {
-      throw new InternalServerErrorException('AI Service is not configured properly');
+      return this.generateFallbackAnswer(question, summary);
     }
 
     try {
@@ -145,5 +150,15 @@ Hãy đưa ra câu trả lời:`;
       this.logger.error(`AI generation failed: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to generate answer from AI');
     }
+  }
+
+  private generateFallbackAnswer(question: string, summary: string): string {
+    return [
+      `Tom tat lien quan: ${summary.slice(0, 400)}${summary.length > 400 ? '...' : ''}`,
+      `Tra loi ngan gon cho cau hoi "${question}":`,
+      '- He thong local dang chay o che do fallback vi GEMINI_API_KEY chua duoc cau hinh.',
+      '- Ban co the cau hinh GEMINI_API_KEY de nhan cau tra loi AI day du hon.',
+      '- Dua tren ngu canh hien co, hay doi chieu cau hoi voi phan tom tat tai lieu de tiep tuc hoc.',
+    ].join('\n');
   }
 }

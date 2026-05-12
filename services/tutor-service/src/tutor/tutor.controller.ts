@@ -2,7 +2,7 @@ import { Controller, Post, Body, HttpCode, HttpStatus } from '@nestjs/common';
 import { TutorService } from './tutor.service';
 import { AskDto } from './dto/ask.dto';
 
-@Controller('tutor')
+@Controller('api/tutor')
 export class TutorController {
   constructor(private readonly tutorService: TutorService) {}
 

@@ -44,7 +44,7 @@ async function bootstrap() {
     logger.warn('RabbitMQ is disabled for Dashboard Service');
   }
 
-  const port = Number(process.env.PORT || 3008);
+  const port = Number(process.env.PORT || 3002);
   await app.listen(port);
   logger.log(`Dashboard Service is running on http://localhost:${port}`);
   logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);

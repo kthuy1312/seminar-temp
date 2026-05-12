@@ -312,7 +312,7 @@ export class DashboardService {
     tx: Prisma.TransactionClient,
     userId: string,
     action: string,
-    metadata: Prisma.InputJsonObject,
+    metadata: Prisma.InputJsonValue,
     createdAt: Date,
   ) {
     await tx.activityLog.create({
@@ -368,9 +368,9 @@ export class DashboardService {
 
   private toJson(
     payload: object,
-  ): Prisma.InputJsonObject {
+  ): Prisma.InputJsonValue {
     return JSON.parse(
       JSON.stringify(payload),
-    ) as Prisma.InputJsonObject;
+    ) as Prisma.InputJsonValue;
   }
 }

@@ -37,9 +37,9 @@ async function bootstrap() {
   app.useGlobalInterceptors(new TransformInterceptor());
 
   // ── CORS ───────────────────────────────────────────────────
-  app.enableCors({ origin: '*', credentials: true });
+  app.enableCors({ origin: '*', credentials: false });
 
-  const port = process.env.PORT ?? 3004;
+  const port = process.env.PORT ?? 3003;
   await app.listen(port);
 
   console.log(`📄 Document Service is running on http://localhost:${port}`);

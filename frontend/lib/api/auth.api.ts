@@ -12,33 +12,42 @@ export type LoginPayload = {
   password: string;
 };
 
+type ApiEnvelope<T> = {
+  success: boolean;
+  data: T;
+};
+
 export async function register(payload: RegisterPayload) {
-  return apiRequest<AuthResponse>("/api/auth/register", {
+  const response = await apiRequest<ApiEnvelope<AuthResponse>>("/api/auth/register", {
     method: "POST",
     body: payload,
   });
+  return response.data;
 }
 
 export async function login(payload: LoginPayload) {
-  const response = await apiRequest<AuthResponse>("/api/auth/login", {
+  const response = await apiRequest<ApiEnvelope<AuthResponse>>("/api/auth/login", {
     method: "POST",
     body: payload,
   });
+  const auth = response.data;
 
   if (typeof window !== "undefined") {
-    localStorage.setItem("accessToken", response.accessToken);
-    localStorage.setItem("refreshToken", response.refreshToken);
+    localStorage.setItem("accessToken", auth.accessToken);
+    localStorage.setItem("refreshToken", auth.refreshToken);
   }
-  return response;
+  return auth;
 }
 
 export async function getCurrentUser() {
-  return apiRequest<AuthUser>("/api/auth/profile");
+  const response = await apiRequest<ApiEnvelope<AuthUser>>("/api/auth/profile");
+  return response.data;
 }
 
 export async function updateProfile(payload: { fullName?: string; avatarUrl?: string }) {
-  return apiRequest<AuthUser>("/api/auth/profile", {
+  const response = await apiRequest<ApiEnvelope<AuthUser>>("/api/auth/profile", {
     method: "PUT",
     body: payload,
   });
+  return response.data;
 }

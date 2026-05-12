@@ -30,13 +30,16 @@ export async function getDashboardOverview() {
   const stats = await apiRequest<DashboardStatsResponse>("/api/dashboard/stats");
   const totals = stats.data?.totals || {};
   const averages = stats.data?.averages || {};
+  const completedGoals = Number(totals.completedGoals || 0);
+  const totalGoals = Number(totals.totalGoals || 0);
+  const progressPercent = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
 
   const overview: DashboardOverview = {
-    progressPercent: Number(totals.completionRate || 0),
+    progressPercent,
     stats: [
-      { label: "Hours studied", value: String(totals.documents || 0) },
-      { label: "Tasks completed", value: String(totals.goals || 0) },
-      { label: "Current streak", value: `${averages.streakDays || 0} days` },
+      { label: "Hours studied", value: String(totals.totalDocuments || 0) },
+      { label: "Tasks completed", value: String(completedGoals) },
+      { label: "Current streak", value: `${averages.avgStudyStreak || 0} days` },
     ],
     nextTasks: [],
     suggestions: [],

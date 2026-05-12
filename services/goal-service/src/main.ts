@@ -10,7 +10,10 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // Enable CORS
-  app.enableCors();
+  app.enableCors({
+    origin: '*',
+    credentials: false,
+  });
 
   // Global validation pipe
   app.useGlobalPipes(
@@ -57,7 +60,7 @@ async function bootstrap() {
     },
   });
 
-  const port = process.env.PORT ?? 3002;
+  const port = process.env.PORT ?? 3004;
   await app.listen(port);
 
   logger.log(`🚀 Goal Service listening on port ${port}`);

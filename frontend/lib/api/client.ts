@@ -37,6 +37,19 @@ export function clearAuthTokens() {
   localStorage.removeItem("refreshToken");
 }
 
+function unwrapApiEnvelope<T>(payload: unknown): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    "success" in payload
+  ) {
+    return (payload as { data: T }).data;
+  }
+
+  return payload as T;
+}
+
 export async function apiRequest<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
   const token = getAccessToken();
   let response = await fetch(`${getBaseUrl()}${path}`, {
@@ -62,7 +75,9 @@ export async function apiRequest<T>(path: string, options: ApiClientOptions = {}
       });
 
       if (refreshResponse.ok) {
-        const refreshed = (await refreshResponse.json()) as { accessToken: string; refreshToken: string };
+        const refreshed = unwrapApiEnvelope<{ accessToken: string; refreshToken: string }>(
+          await refreshResponse.json()
+        );
         if (typeof window !== "undefined") {
           localStorage.setItem("accessToken", refreshed.accessToken);
           localStorage.setItem("refreshToken", refreshed.refreshToken);
