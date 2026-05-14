@@ -1,4 +1,4 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body } from '@nestjs/common';
 import { EventPattern, Payload } from '@nestjs/microservices';
 import { SummaryService } from './summary.service';
 
@@ -15,6 +15,15 @@ export class SummaryController {
   @Get('document/:id')
   async getSummaryByDocumentId(@Param('id') documentId: string) {
     const summary = await this.summaryService.getSummaryByDocumentId(documentId);
+    return {
+      success: true,
+      data: summary,
+    };
+  }
+
+  @Post('generate')
+  async generateSummary(@Body() body: { documentId: string }) {
+    const summary = await this.summaryService.generateSummary(body.documentId);
     return {
       success: true,
       data: summary,

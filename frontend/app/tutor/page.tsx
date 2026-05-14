@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 
 import { sendTutorMessage } from "@/lib/api/tutor.api";
+import { getDocuments } from "@/lib/api/document.api";
+import { DocumentItem } from "@/types/document";
 
 type MessageRole = "user" | "ai";
 
@@ -23,12 +25,32 @@ export default function TutorPage() {
     {
       id: 1,
       role: "ai",
-      content: "Hi! I'm your AI tutor. Ask me anything.",
+      content: "Hi! I'm your AI tutor. Ask me anything about your uploaded documents.",
     },
   ]);
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [documents, setDocuments] = useState<DocumentItem[]>([]);
+  const [selectedDocId, setSelectedDocId] = useState<string>("");
+  const [loadingDocs, setLoadingDocs] = useState(true);
   const messageListRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Load documents
+    getDocuments()
+      .then((docs) => {
+        setDocuments(docs);
+        if (docs.length > 0) {
+          setSelectedDocId(docs[0].id);
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load documents:", err);
+      })
+      .finally(() => {
+        setLoadingDocs(false);
+      });
+  }, []);
 
   useEffect(() => {
     const container = messageListRef.current;
@@ -41,7 +63,7 @@ export default function TutorPage() {
 
   const sendMessage = (content: string) => {
     const trimmed = content.trim();
-    if (!trimmed || isLoading) return;
+    if (!trimmed || isLoading || !selectedDocId) return;
 
     const userMessage: Message = {
       id: Date.now(),
@@ -55,7 +77,7 @@ export default function TutorPage() {
 
     sendTutorMessage({
       question: trimmed,
-      documentId: "00000000-0000-0000-0000-000000000001",
+      documentId: selectedDocId,
     })
       .then((response) => {
         const aiMessage: Message = {
@@ -151,12 +173,13 @@ export default function TutorPage() {
               type="text"
               value={input}
               onChange={(event) => setInput(event.target.value)}
-              placeholder="Ask your question..."
-              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              placeholder={selectedDocId ? "Ask your question..." : "Select a document first..."}
+              disabled={!selectedDocId || isLoading}
+              className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition disabled:bg-slate-100 disabled:cursor-not-allowed focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
             />
             <button
               type="submit"
-              disabled={!input.trim() || isLoading}
+              disabled={!input.trim() || isLoading || !selectedDocId}
               className="rounded-xl bg-blue-500 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
             >
               Send
@@ -170,20 +193,34 @@ export default function TutorPage() {
 
         <div className="mt-4 space-y-4 text-sm">
           <div>
-            <p className="font-medium text-slate-800">Related documents</p>
-            <ul className="mt-2 space-y-1 text-slate-600">
-              <li>Algebra Notes - Chapter 1</li>
-              <li>Physics Formula Sheet</li>
-              <li>Chemistry Quick Summary</li>
-            </ul>
+            <p className="font-medium text-slate-800">Select document</p>
+            {loadingDocs ? (
+              <p className="mt-2 text-slate-500">Loading documents...</p>
+            ) : documents.length === 0 ? (
+              <p className="mt-2 text-slate-500">No documents uploaded yet. Please upload a document to use the tutor.</p>
+            ) : (
+              <select
+                value={selectedDocId}
+                onChange={(e) => setSelectedDocId(e.target.value)}
+                className="mt-2 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-700 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+              >
+                {documents.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.fileName}
+                  </option>
+                ))}
+              </select>
+            )}
           </div>
 
-          <div>
-            <p className="font-medium text-slate-800">Current topic</p>
-            <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-slate-700">
-              Algebra basics and equation solving
-            </p>
-          </div>
+          {selectedDocId && documents.length > 0 && (
+            <div>
+              <p className="font-medium text-slate-800">Current document</p>
+              <p className="mt-2 rounded-lg bg-slate-100 px-3 py-2 text-slate-700">
+                {documents.find((d) => d.id === selectedDocId)?.fileName}
+              </p>
+            </div>
+          )}
 
           <div>
             <p className="font-medium text-slate-800">Quick prompts</p>
@@ -193,10 +230,16 @@ export default function TutorPage() {
                   key={prompt}
                   type="button"
                   onClick={() => sendMessage(prompt)}
-                  disabled={isLoading}
+                  disabled={isLoading || !selectedDocId}
                   className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {prompt}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </aside>
                 </button>
               ))}
             </div>

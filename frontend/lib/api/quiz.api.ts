@@ -13,8 +13,14 @@ export async function getQuizById(id: string) {
 }
 
 export async function listQuiz() {
-  // TODO: quiz-service has no GET /quiz list endpoint yet.
-  return [] as QuizItem[];
+  // TODO: quiz-service needs GET /api/quiz endpoint for listing
+  // For now, call the endpoint when implemented
+  try {
+    return apiRequest<QuizItem[]>("/api/quiz");
+  } catch (error) {
+    console.warn("Quiz list endpoint not yet implemented. Returning empty array.");
+    return [];
+  }
 }
 
 export async function submitQuiz(payload: {

@@ -109,6 +109,41 @@ export class QuizService {
     return quiz;
   }
 
+  async listQuizzes(userId: string, skip: number = 0, take: number = 10) {
+    try {
+      const quizzes = await this.prisma.quiz.findMany({
+        skip,
+        take,
+        include: {
+          questions: {
+            select: {
+              id: true,
+              questionText: true,
+              options: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      });
+
+      const total = await this.prisma.quiz.count();
+
+      return {
+        data: quizzes,
+        pagination: {
+          skip,
+          take,
+          total,
+        },
+      };
+    } catch (error) {
+      console.error('Error listing quizzes:', error.message);
+      throw new InternalServerErrorException('Failed to list quizzes');
+    }
+  }
+
   async submitQuiz(quizId: string, userId: string, answers: Record<string, string>) {
     const quiz = await this.prisma.quiz.findUnique({
       where: { id: quizId },

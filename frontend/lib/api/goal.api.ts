@@ -11,30 +11,23 @@ export async function createGoal(payload: {
   category?: string;
   target_date?: string;
 }) {
+  // ℹ️ x-user-id will be automatically added by API Gateway from JWT token
   return apiRequest<GoalItem>("/api/goals", {
     method: "POST",
     body: payload,
-    headers: {
-      "x-user-id": "00000000-0000-0000-0000-000000000001",
-    },
   });
 }
 
 export async function getGoals() {
-  const response = await apiRequest<GoalListResponse>("/api/goals", {
-    headers: {
-      "x-user-id": "00000000-0000-0000-0000-000000000001",
-    },
-  });
+  // ℹ️ x-user-id will be automatically added by API Gateway from JWT token
+  const response = await apiRequest<GoalListResponse>("/api/goals");
   return response.data || [];
 }
 
 export async function updateGoal(id: string, payload: Partial<GoalItem>) {
+  // ℹ️ x-user-id will be automatically added by API Gateway from JWT token
   return apiRequest<GoalItem>(`/api/goals/${id}`, {
     method: "PUT",
     body: payload,
-    headers: {
-      "x-user-id": "00000000-0000-0000-0000-000000000001",
-    },
   });
 }

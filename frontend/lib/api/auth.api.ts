@@ -1,5 +1,6 @@
 import { apiRequest } from "@/lib/api/client";
 import { AuthResponse, AuthUser } from "@/types/auth";
+import { clearTokens, saveTokens } from "@/lib/auth.utils";
 
 export type RegisterPayload = {
   email: string;
@@ -22,7 +23,13 @@ export async function register(payload: RegisterPayload) {
     method: "POST",
     body: payload,
   });
-  return response.data;
+  const auth = response.data;
+
+  // Save tokens after registration
+  if (typeof window !== "undefined") {
+    saveTokens(auth.accessToken, auth.refreshToken);
+  }
+  return auth;
 }
 
 export async function login(payload: LoginPayload) {
@@ -32,11 +39,29 @@ export async function login(payload: LoginPayload) {
   });
   const auth = response.data;
 
+  // Save tokens after login
   if (typeof window !== "undefined") {
-    localStorage.setItem("accessToken", auth.accessToken);
-    localStorage.setItem("refreshToken", auth.refreshToken);
+    saveTokens(auth.accessToken, auth.refreshToken);
   }
   return auth;
+}
+
+export async function logout() {
+  try {
+    // Call logout endpoint to revoke refresh token on backend
+    const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null;
+    if (refreshToken) {
+      await apiRequest("/api/auth/logout", {
+        method: "POST",
+        body: { refreshToken },
+      });
+    }
+  } catch (error) {
+    console.error("Logout failed:", error);
+  } finally {
+    // Always clear tokens locally regardless of backend response
+    clearTokens();
+  }
 }
 
 export async function getCurrentUser() {

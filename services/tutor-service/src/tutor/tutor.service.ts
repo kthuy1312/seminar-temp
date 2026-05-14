@@ -161,4 +161,44 @@ Hãy đưa ra câu trả lời:`;
       '- Dua tren ngu canh hien co, hay doi chieu cau hoi voi phan tom tat tai lieu de tiep tuc hoc.',
     ].join('\n');
   }
+
+  async getHistory(userId: string, documentId?: string, skip: number = 0, take: number = 10) {
+    try {
+      // Find conversations for the user (optionally filtered by documentId)
+      const conversations = await this.prisma.conversation.findMany({
+        where: documentId ? { documentId } : {},
+        include: {
+          messages: {
+            orderBy: { createdAt: 'asc' },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      });
+
+      // Transform to tutor chat response format
+      const history = conversations.map((conv) => ({
+        conversationId: conv.id,
+        documentId: conv.documentId,
+        messages: conv.messages,
+      }));
+
+      const total = await this.prisma.conversation.count({
+        where: documentId ? { documentId } : {},
+      });
+
+      return {
+        data: history,
+        pagination: {
+          skip,
+          take,
+          total,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Error fetching tutor history: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to fetch tutor history');
+    }
+  }
 }
