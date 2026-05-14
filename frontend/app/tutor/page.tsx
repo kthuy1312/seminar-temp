@@ -240,12 +240,6 @@ export default function TutorPage() {
           </div>
         </div>
       </aside>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      </aside>
     </div>
   );
 }

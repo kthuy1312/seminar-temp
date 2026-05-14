@@ -3,7 +3,6 @@ import { ConfigService } from '@nestjs/config';
 import { Request, Response } from 'express';
 import {
   createProxyMiddleware,
-  fixRequestBody,
   Options,
 } from 'http-proxy-middleware';
 
@@ -18,21 +17,23 @@ export function buildProxy(configService: ConfigService, config: ProxyConfig) {
   const logger = new Logger(config.proxyName);
   const target = configService.get<string>(config.envKey, config.fallback);
 
+  // NOTE: NestFactory is created with bodyParser: false so the raw body stream
+  // is passed through untouched. No need to re-serialize req.body here.
   const proxy = createProxyMiddleware({
     target,
     changeOrigin: true,
     xfwd: true,
+    proxyTimeout: 30000,
+    timeout: 30000,
     on: {
-      proxyReq: (proxyReq, req) => {
+      proxyReq: (proxyReq, req: Request) => {
         if (req.headers.authorization) {
           proxyReq.setHeader('authorization', req.headers.authorization);
         }
 
         if (req.headers['x-user-id']) {
-          proxyReq.setHeader('x-user-id', req.headers['x-user-id']);
+          proxyReq.setHeader('x-user-id', req.headers['x-user-id'] as string);
         }
-
-        fixRequestBody(proxyReq, req);
 
         logger.debug(`Proxying ${req.method} ${req.url} -> ${target}`);
       },

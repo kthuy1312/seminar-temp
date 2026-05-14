@@ -1,18 +1,29 @@
 import { apiRequest } from "@/lib/api/client";
 import { DashboardActivity, DashboardOverview } from "@/types/dashboard";
 
+// Matches the actual response shape from dashboard-service getStats()
+// Per-user response: flat UserStats object inside data
+// Global (no userId) response: nested totals/averages
 type DashboardStatsResponse = {
   success: boolean;
   data: {
+    // Nested global shape
     totals?: {
-      goals?: number;
-      documents?: number;
-      quizzes?: number;
-      completionRate?: number;
+      totalGoals?: number;
+      completedGoals?: number;
+      totalDocuments?: number;
+      totalQuizzes?: number;
     };
     averages?: {
-      streakDays?: number;
+      avgQuizScore?: number;
+      avgStudyStreak?: number;
     };
+    // Flat per-user shape (UserStats entity)
+    totalGoals?: number;
+    completedGoals?: number;
+    totalDocuments?: number;
+    totalQuizzes?: number;
+    studyStreak?: number;
   };
 };
 
@@ -28,18 +39,28 @@ type DashboardProgressResponse = {
 
 export async function getDashboardOverview() {
   const stats = await apiRequest<DashboardStatsResponse>("/api/dashboard/stats");
-  const totals = stats.data?.totals || {};
-  const averages = stats.data?.averages || {};
-  const completedGoals = Number(totals.completedGoals || 0);
-  const totalGoals = Number(totals.totalGoals || 0);
-  const progressPercent = totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+  const d = stats.data || {};
+
+  // Backend returns nested (global) or flat (per-user) shape
+  const completedGoals = Number(
+    d.completedGoals ?? d.totals?.completedGoals ?? 0,
+  );
+  const totalGoals = Number(d.totalGoals ?? d.totals?.totalGoals ?? 0);
+  const totalDocuments = Number(
+    d.totalDocuments ?? d.totals?.totalDocuments ?? 0,
+  );
+  const avgStudyStreak = Number(
+    d.studyStreak ?? d.averages?.avgStudyStreak ?? 0,
+  );
+  const progressPercent =
+    totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
 
   const overview: DashboardOverview = {
     progressPercent,
     stats: [
-      { label: "Hours studied", value: String(totals.totalDocuments || 0) },
+      { label: "Documents uploaded", value: String(totalDocuments) },
       { label: "Tasks completed", value: String(completedGoals) },
-      { label: "Current streak", value: `${averages.avgStudyStreak || 0} days` },
+      { label: "Current streak", value: `${avgStudyStreak} days` },
     ],
     nextTasks: [],
     suggestions: [],

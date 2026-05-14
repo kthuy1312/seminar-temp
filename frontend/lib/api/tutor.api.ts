@@ -12,13 +12,7 @@ export async function sendTutorMessage(payload: {
   });
 }
 
-export async function getTutorHistory() {
-  // TODO: tutor-service needs GET /api/tutor/history endpoint
-  // For now, call the endpoint when implemented
-  try {
-    return apiRequest<TutorChatResponse[]>("/api/tutor/history");
-  } catch (error) {
-    console.warn("Tutor history endpoint not yet implemented. Returning empty array.");
-    return [];
-  }
+export async function getTutorHistory(documentId?: string) {
+  const params = documentId ? `?documentId=${documentId}` : "";
+  return apiRequest<TutorChatResponse[]>(`/api/tutor/history${params}`);
 }

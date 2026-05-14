@@ -2,7 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // IMPORTANT: bodyParser must be disabled so http-proxy-middleware can
+  // forward the raw body stream to upstream services.
+  const app = await NestFactory.create(AppModule, { bodyParser: false });
 
   // CORS
   app.enableCors({
