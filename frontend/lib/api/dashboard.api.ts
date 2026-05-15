@@ -1,13 +1,12 @@
 import { apiRequest } from "@/lib/api/client";
+import { getGoals } from "@/lib/api/goal.api";
+import { getFlashcards } from "@/lib/api/quiz.api";
 import { DashboardActivity, DashboardOverview } from "@/types/dashboard";
+import type { AiAnalysis, GoalItem } from "@/types/goal";
 
-// Matches the actual response shape from dashboard-service getStats()
-// Per-user response: flat UserStats object inside data
-// Global (no userId) response: nested totals/averages
 type DashboardStatsResponse = {
   success: boolean;
   data: {
-    // Nested global shape
     totals?: {
       totalGoals?: number;
       completedGoals?: number;
@@ -18,12 +17,12 @@ type DashboardStatsResponse = {
       avgQuizScore?: number;
       avgStudyStreak?: number;
     };
-    // Flat per-user shape (UserStats entity)
     totalGoals?: number;
     completedGoals?: number;
     totalDocuments?: number;
     totalQuizzes?: number;
     studyStreak?: number;
+    avgQuizScore?: number;
   };
 };
 
@@ -37,33 +36,64 @@ type DashboardProgressResponse = {
   data: Array<{ date: string; completedGoals: number }>;
 };
 
-export async function getDashboardOverview() {
-  const stats = await apiRequest<DashboardStatsResponse>("/api/dashboard/stats");
-  const d = stats.data || {};
+function buildSuggestions(analysis: AiAnalysis | null | undefined): string[] {
+  if (!analysis) {
+    return ["Tạo mục tiêu tiếng Anh để nhận gợi ý cá nhân hóa từ AI."];
+  }
+  const suggestions: string[] = [];
+  if (analysis.priority_skills?.length) {
+    const skills = analysis.priority_skills.map((s) => s.skill).join(", ");
+    suggestions.push(`Nên ưu tiên luyện: ${skills}.`);
+  } else if (analysis.priority_subjects?.length) {
+    suggestions.push(`Ưu tiên: ${analysis.priority_subjects.join(", ")}.`);
+  }
+  if (analysis.suggestions?.length) {
+    suggestions.push(...analysis.suggestions.slice(0, 2));
+  }
+  if (analysis.learning_strategy) {
+    suggestions.push(analysis.learning_strategy);
+  }
+  return suggestions.length > 0 ? suggestions.slice(0, 3) : ["Tiếp tục luyện tập đều mỗi ngày."];
+}
 
-  // Backend returns nested (global) or flat (per-user) shape
-  const completedGoals = Number(
-    d.completedGoals ?? d.totals?.completedGoals ?? 0,
-  );
-  const totalGoals = Number(d.totalGoals ?? d.totals?.totalGoals ?? 0);
-  const totalDocuments = Number(
-    d.totalDocuments ?? d.totals?.totalDocuments ?? 0,
-  );
-  const avgStudyStreak = Number(
-    d.studyStreak ?? d.averages?.avgStudyStreak ?? 0,
-  );
-  const progressPercent =
-    totalGoals > 0 ? Math.round((completedGoals / totalGoals) * 100) : 0;
+export async function getDashboardOverview(): Promise<DashboardOverview> {
+  const [statsRaw, goals, flashcards] = await Promise.all([
+    apiRequest<DashboardStatsResponse["data"]>("/api/dashboard/stats").catch(
+      () => ({}) as DashboardStatsResponse["data"]
+    ),
+    getGoals().catch(() => [] as GoalItem[]),
+    getFlashcards().catch(() => []),
+  ]);
+
+  const d = statsRaw || {};
+  const totalQuizzes = Number(d.totalQuizzes ?? d.totals?.totalQuizzes ?? 0);
+  const totalDocuments = Number(d.totalDocuments ?? d.totals?.totalDocuments ?? 0);
+  const studyStreak = Number(d.studyStreak ?? d.averages?.avgStudyStreak ?? 0);
+  const avgQuizScore = Number(d.avgQuizScore ?? d.averages?.avgQuizScore ?? 0);
+
+  const latestGoal = goals[0] as GoalItem | undefined;
+  const roadmapItems = latestGoal?.roadmap_items ?? [];
+  const roadmapDone = roadmapItems.filter((r) => r.is_completed).length;
+  const roadmapPercent =
+    roadmapItems.length > 0 ? Math.round((roadmapDone / roadmapItems.length) * 100) : 0;
+
+  const skillSet = new Set(latestGoal?.subjects ?? []);
+  const skillProgress = ["Listening", "Speaking", "Reading", "Writing", "Vocabulary", "Grammar"]
+    .filter((s) => skillSet.has(s))
+    .join(", ") || "Chưa thiết lập";
 
   const overview: DashboardOverview = {
-    progressPercent,
+    progressPercent: roadmapPercent,
     stats: [
-      { label: "Documents uploaded", value: String(totalDocuments) },
-      { label: "Tasks completed", value: String(completedGoals) },
-      { label: "Current streak", value: `${avgStudyStreak} days` },
+      { label: "Từ vựng (flashcard)", value: String(flashcards.length) },
+      { label: "Quiz đã làm", value: String(totalQuizzes) },
+      { label: "Chuỗi học tập", value: `${studyStreak} ngày` },
+      { label: "Lộ trình hoàn thành", value: `${roadmapPercent}%` },
     ],
+    skillProgress,
+    avgQuizScore,
     nextTasks: [],
-    suggestions: [],
+    suggestions: buildSuggestions(latestGoal?.ai_analysis),
   };
 
   return overview;

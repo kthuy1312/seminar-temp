@@ -1,10 +1,8 @@
-import { User } from './user.entity';
 export declare class RefreshToken {
     id: string;
-    userId: string;
     token: string;
+    userId: string;
+    createdAt: Date;
     expiresAt: Date;
     isRevoked: boolean;
-    createdAt: Date;
-    user: User;
 }

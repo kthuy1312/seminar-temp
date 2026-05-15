@@ -62,4 +62,16 @@ export declare class QuizController {
         total: number;
         answers: import("@prisma/client/runtime/library").JsonValue;
     }>;
+    listFlashcards(userId: string, documentId?: string): Promise<{
+        id: string;
+        documentId: string;
+        createdAt: Date;
+        userId: string;
+        front: string;
+        back: string;
+    }[]>;
+    generateFlashcards(userId: string, documentId: string): Promise<any[]>;
+    deleteFlashcard(userId: string, id: string): Promise<{
+        success: boolean;
+    }>;
 }

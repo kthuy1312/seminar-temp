@@ -26,18 +26,20 @@ export async function uploadDocument(payload: { file: File; userId?: string }) {
   if (!response.ok) {
     throw new Error(await response.text());
   }
-  return (await response.json()) as DocumentEnvelope;
+  const json = (await response.json()) as DocumentEnvelope;
+  return json;
 }
 
+export type UploadDocumentResult = DocumentEnvelope;
+
 export async function getDocuments() {
-  const response = await apiRequest<DocumentEnvelope>("/api/documents");
-  const data = response.data;
+  const data = await apiRequest<DocumentItem[]>("/api/documents");
   return Array.isArray(data) ? data : [];
 }
 
 export async function getDocumentById(id: string) {
-  const response = await apiRequest<DocumentEnvelope>(`/api/documents/${id}`);
-  return (response.data || null) as DocumentItem | null;
+  const data = await apiRequest<DocumentItem>(`/api/documents/${id}`);
+  return data || null;
 }
 
 export async function deleteDocument(id: string) {

@@ -14,44 +14,37 @@ export declare class DashboardService {
     private readonly logger;
     constructor(prisma: PrismaService);
     getStats(userId?: string): Promise<{
-        success: boolean;
-        data: {
-            userId: string;
-            id: string;
+        userId: string;
+        id: string;
+        totalGoals: number;
+        completedGoals: number;
+        totalDocuments: number;
+        totalQuizzes: number;
+        avgQuizScore: Prisma.Decimal;
+        studyStreak: number;
+        lastActive: Date | null;
+        updatedAt: Date;
+        createdAt: Date;
+    } | {
+        totalUsers: number;
+        totals: {
             totalGoals: number;
             completedGoals: number;
             totalDocuments: number;
             totalQuizzes: number;
-            avgQuizScore: Prisma.Decimal;
-            studyStreak: number;
-            lastActive: Date | null;
-            updatedAt: Date;
-            createdAt: Date;
         };
-    } | {
-        success: boolean;
-        data: {
-            totalUsers: number;
-            totals: {
-                totalGoals: number;
-                completedGoals: number;
-                totalDocuments: number;
-                totalQuizzes: number;
-            };
-            averages: {
-                avgQuizScore: number;
-                avgStudyStreak: number;
-            };
+        averages: {
+            avgQuizScore: number;
+            avgStudyStreak: number;
         };
     }>;
     getActivity(query: GetActivityQueryDto): Promise<{
-        success: boolean;
         data: {
             userId: string;
-            metadata: Prisma.JsonValue | null;
             id: string;
             createdAt: Date;
             action: string;
+            metadata: Prisma.JsonValue | null;
         }[];
         pagination: {
             total: number;
@@ -60,14 +53,11 @@ export declare class DashboardService {
         };
     }>;
     getProgress(query: GetProgressQueryDto): Promise<{
-        success: boolean;
-        data: {
-            completedGoals: number;
-            quizzes: number;
-            docs: number;
-            date: string;
-        }[];
-    }>;
+        completedGoals: number;
+        quizzes: number;
+        docs: number;
+        date: string;
+    }[]>;
     handleUserCreated(payload: UserCreatedEventDto): Promise<void>;
     handleGoalCreated(payload: GoalCreatedEventDto): Promise<void>;
     handleGoalCompleted(payload: GoalCompletedEventDto): Promise<void>;

@@ -1,5 +1,6 @@
-import { BaseEventDto } from './base-event.dto';
-export declare class SummaryCreatedEventDto extends BaseEventDto {
+export declare class SummaryCreatedEventDto {
+    user_id: string;
     summary_id: string;
     document_id: string;
+    occurred_at?: string;
 }

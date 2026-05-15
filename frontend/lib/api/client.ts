@@ -6,6 +6,8 @@ export type ApiClientOptions = {
   method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   headers?: Record<string, string>;
+  /** Request timeout in ms (default 120s for AI endpoints) */
+  timeoutMs?: number;
 };
 
 export class ApiError extends Error {
@@ -50,9 +52,24 @@ function unwrapApiEnvelope<T>(payload: unknown): T {
   return payload as T;
 }
 
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function apiRequest<T>(path: string, options: ApiClientOptions = {}): Promise<T> {
   const token = getAccessToken();
-  let response = await fetch(`${getBaseUrl()}${path}`, {
+  const timeoutMs = options.timeoutMs ?? 120000;
+  const fetchInit: RequestInit = {
     method: options.method || "GET",
     headers: {
       "Content-Type": "application/json",
@@ -60,7 +77,20 @@ export async function apiRequest<T>(path: string, options: ApiClientOptions = {}
       ...(options.headers || {}),
     },
     body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-  });
+  };
+
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(`${getBaseUrl()}${path}`, fetchInit, timeoutMs);
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new ApiError("Yêu cầu quá thời gian chờ. AI có thể đang xử lý — thử lại sau.", 408);
+    }
+    throw new ApiError(
+      "Không kết nối được máy chủ. Kiểm tra API Gateway (port 3000) và các service đang chạy.",
+      0,
+    );
+  }
 
   if (response.status === 401) {
     const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refreshToken") : null;
@@ -83,15 +113,19 @@ export async function apiRequest<T>(path: string, options: ApiClientOptions = {}
           localStorage.setItem("refreshToken", refreshed.refreshToken);
         }
 
-        response = await fetch(`${getBaseUrl()}${path}`, {
-          method: options.method || "GET",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${refreshed.accessToken}`,
-            ...(options.headers || {}),
+        response = await fetchWithTimeout(
+          `${getBaseUrl()}${path}`,
+          {
+            method: options.method || "GET",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${refreshed.accessToken}`,
+              ...(options.headers || {}),
+            },
+            body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
           },
-          body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-        });
+          timeoutMs,
+        );
       }
     }
 
@@ -110,5 +144,5 @@ export async function apiRequest<T>(path: string, options: ApiClientOptions = {}
     return undefined as T;
   }
 
-  return (await response.json()) as T;
+  return unwrapApiEnvelope<T>(await response.json());
 }

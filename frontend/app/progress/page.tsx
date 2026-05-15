@@ -13,7 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { getDashboardOverview, getDashboardProgress } from "@/lib/api/dashboard.api";
 
-const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const weekDays = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
 
 export default function ProgressPage() {
   const [chartData, setChartData] = useState<Array<{ day: string; hours: number }>>([]);
@@ -32,8 +32,8 @@ export default function ProgressPage() {
         ]);
 
         setCompletion(overview.progressPercent);
-        setTasksDone(Number(overview.stats.find((item) => item.label === "Tasks completed")?.value || 0));
-        setStreakDays(Number((overview.stats.find((item) => item.label === "Current streak")?.value || "0").split(" ")[0]));
+        setTasksDone(Number(overview.stats.find((item) => item.label === "Nhiệm vụ hoàn thành")?.value || 0));
+        setStreakDays(Number((overview.stats.find((item) => item.label === "Chuỗi ngày học")?.value || "0").split(" ")[0]));
         setChartData(
           progress.map((item) => ({
             day: weekDays[new Date(item.date).getDay()] || "N/A",
@@ -41,7 +41,7 @@ export default function ProgressPage() {
           }))
         );
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Cannot load progress");
+        setError(err instanceof Error ? err.message : "Không thể tải tiến độ");
       } finally {
         setLoading(false);
       }
@@ -58,13 +58,12 @@ export default function ProgressPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-5">
       <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm md:p-6">
-        <p className="text-sm font-medium text-blue-500">Progress Tracking</p>
+        <p className="text-sm font-medium text-blue-500">Theo dõi tiến độ</p>
         <h1 className="mt-1 text-2xl font-bold text-slate-900 md:text-3xl">
-          Learning Progress Overview
+          Tổng Quan Tiến Độ Học Tập
         </h1>
         <p className="mt-2 text-sm text-slate-600">
-          Track your weekly study hours, completion rate, and consistency in one
-          place.
+          Theo dõi giờ học hàng tuần, tỷ lệ hoàn thành và sự kiên trì của bạn tại một nơi duy nhất.
         </p>
       </section>
 
@@ -72,9 +71,9 @@ export default function ProgressPage() {
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-base font-semibold text-slate-900">
-              Study Hours (Bar Chart)
+              Giờ học (Biểu đồ cột)
             </h2>
-            <span className="text-sm text-slate-500">This week</span>
+            <span className="text-sm text-slate-500">Tuần này</span>
           </div>
 
           <div className="mt-4 overflow-x-auto">
@@ -97,14 +96,14 @@ export default function ProgressPage() {
             </div>
           </div>
           {!loading && chartData.length === 0 && (
-            <p className="mt-3 text-sm text-slate-500">No progress data yet.</p>
+            <p className="mt-3 text-sm text-slate-500">Chưa có dữ liệu tiến độ.</p>
           )}
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
-          <h2 className="text-base font-semibold text-slate-900">Completion Rate</h2>
+          <h2 className="text-base font-semibold text-slate-900">Tỷ Lệ Hoàn Thành</h2>
           <p className="mt-2 text-sm text-slate-600">
-            {completion}% of your roadmap is completed.
+            Bạn đã hoàn thành {completion}% lộ trình.
           </p>
           <div className="mt-4 h-2.5 w-full rounded-full bg-slate-100">
             <div
@@ -113,27 +112,27 @@ export default function ProgressPage() {
             />
           </div>
           <p className="mt-4 text-sm font-medium text-slate-700">
-            Keep going, you are making steady progress.
+            Cố gắng lên, bạn đang tiến bộ rất ổn định.
           </p>
         </article>
 
         <article className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm lg:col-span-3">
-          <h2 className="text-base font-semibold text-slate-900">Study Stats</h2>
+          <h2 className="text-base font-semibold text-slate-900">Thống Kê Học Tập</h2>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs text-slate-500">Total hours studied</p>
+              <p className="text-xs text-slate-500">Tổng giờ học</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">
-                {totalHours}h
+                {totalHours} giờ
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs text-slate-500">Tasks completed</p>
+              <p className="text-xs text-slate-500">Nhiệm vụ hoàn thành</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">{tasksDone}</p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs text-slate-500">Study streak</p>
+              <p className="text-xs text-slate-500">Chuỗi ngày học</p>
               <p className="mt-1 text-2xl font-bold text-slate-900">
-                {streakDays}-day streak 🔥
+                {streakDays} ngày 🔥
               </p>
             </div>
           </div>
@@ -141,7 +140,7 @@ export default function ProgressPage() {
       </div>
       {loading && (
         <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
-          Loading progress...
+          Đang tải tiến độ...
         </section>
       )}
       {error && (

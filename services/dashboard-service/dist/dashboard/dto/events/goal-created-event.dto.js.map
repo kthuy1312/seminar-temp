@@ -1,1 +1,1 @@
-{"version":3,"file":"goal-created-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/goal-created-event.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAyC;AACzC,qDAAgD;AAEhD,MAAa,mBAAoB,SAAQ,6BAAY;IAEnD,OAAO,CAAU;CAClB;AAHD,kDAGC;AADC;IADC,IAAA,wBAAM,GAAE;;oDACQ"}
+{"version":3,"file":"goal-created-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/goal-created-event.dto.ts"],"names":[],"mappings":";;;AAAA,MAAa,mBAAmB;CAK/B;AALD,kDAKC"}

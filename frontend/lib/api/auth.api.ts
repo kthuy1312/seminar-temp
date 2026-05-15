@@ -19,11 +19,10 @@ type ApiEnvelope<T> = {
 };
 
 export async function register(payload: RegisterPayload) {
-  const response = await apiRequest<ApiEnvelope<AuthResponse>>("/api/auth/register", {
+  const auth = await apiRequest<AuthResponse>("/api/auth/register", {
     method: "POST",
     body: payload,
   });
-  const auth = response.data;
 
   // Save tokens after registration
   if (typeof window !== "undefined") {
@@ -33,11 +32,10 @@ export async function register(payload: RegisterPayload) {
 }
 
 export async function login(payload: LoginPayload) {
-  const response = await apiRequest<ApiEnvelope<AuthResponse>>("/api/auth/login", {
+  const auth = await apiRequest<AuthResponse>("/api/auth/login", {
     method: "POST",
     body: payload,
   });
-  const auth = response.data;
 
   // Save tokens after login
   if (typeof window !== "undefined") {
@@ -65,14 +63,12 @@ export async function logout() {
 }
 
 export async function getCurrentUser() {
-  const response = await apiRequest<ApiEnvelope<AuthUser>>("/api/auth/profile");
-  return response.data;
+  return apiRequest<AuthUser>("/api/auth/profile");
 }
 
 export async function updateProfile(payload: { fullName?: string; avatarUrl?: string }) {
-  const response = await apiRequest<ApiEnvelope<AuthUser>>("/api/auth/profile", {
+  return apiRequest<AuthUser>("/api/auth/profile", {
     method: "PUT",
     body: payload,
   });
-  return response.data;
 }

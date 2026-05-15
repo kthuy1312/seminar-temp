@@ -23,8 +23,8 @@ export function buildProxy(configService: ConfigService, config: ProxyConfig) {
     target,
     changeOrigin: true,
     xfwd: true,
-    proxyTimeout: 30000,
-    timeout: 30000,
+    proxyTimeout: 120000,
+    timeout: 120000,
     on: {
       proxyReq: (proxyReq, req: Request) => {
         if (req.headers.authorization) {

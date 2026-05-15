@@ -10,23 +10,15 @@ exports.LoggingMiddleware = void 0;
 const common_1 = require("@nestjs/common");
 let LoggingMiddleware = class LoggingMiddleware {
     constructor() {
-        this.logger = new common_1.Logger('Gateway');
+        this.logger = new common_1.Logger('GatewayRequest');
     }
     use(req, res, next) {
-        const { method, originalUrl, ip } = req;
-        const userAgent = req.get('user-agent') || '-';
-        const startTime = Date.now();
-        this.logger.log(`→ ${method} ${originalUrl} [${ip}] ${userAgent}`);
+        const { method, originalUrl } = req;
+        const start = Date.now();
         res.on('finish', () => {
-            const duration = Date.now() - startTime;
+            const duration = Date.now() - start;
             const { statusCode } = res;
-            const logMessage = `← ${method} ${originalUrl} ${statusCode} ${duration}ms`;
-            if (statusCode >= 400) {
-                this.logger.warn(logMessage);
-            }
-            else {
-                this.logger.log(logMessage);
-            }
+            this.logger.log(`${method} ${originalUrl} ${statusCode} - ${duration}ms`);
         });
         next();
     }

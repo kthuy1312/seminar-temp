@@ -15,28 +15,44 @@ const common_1 = require("@nestjs/common");
 const config_1 = require("@nestjs/config");
 const generative_ai_1 = require("@google/generative-ai");
 let AiService = AiService_1 = class AiService {
-    configService;
-    logger = new common_1.Logger(AiService_1.name);
-    genAI;
     constructor(configService) {
         this.configService = configService;
+        this.logger = new common_1.Logger(AiService_1.name);
         const apiKey = this.configService.get('GEMINI_API_KEY');
         this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey || '');
     }
     async summarizeText(text) {
         if (!this.configService.get('GEMINI_API_KEY')) {
-            return this.buildFallbackSummary(text);
+            throw new Error('GEMINI_API_KEY is missing in environment variables. Please add it to your .env file to enable AI summarization.');
         }
         const maxRetries = 3;
-        const timeoutMs = 15000;
-        const prompt = `Bạn là một trợ lý AI học tập xuất sắc. Hãy tóm tắt nội dung tài liệu sau đây thành đúng 5 ý chính. Trình bày bằng tiếng Việt, dưới dạng danh sách gạch đầu dòng:\n\n${text}`;
+        const timeoutMs = 60000;
+        const modelName = this.configService.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+        const inputText = text.length > 30000 ? `${text.slice(0, 30000)}\n\n[...đã cắt bớt...]` : text;
+        const prompt = `Bạn là trợ lý học Tiếng Anh. Tóm tắt tài liệu sau bằng tiếng Việt, theo cấu trúc Markdown:
+
+## Câu hỏi / Bài tập trong tài liệu
+- Liệt kê ĐẦY ĐỦ từng câu hỏi (giữ nguyên tiếng Anh) và các đáp án A/B/C/D nếu có
+- Nếu là bài quiz/grammar test, không bỏ sót câu nào
+
+## Từ vựng chính
+- 5-10 từ/cụm quan trọng + nghĩa tiếng Việt
+
+## Ngữ pháp quan trọng
+- Các điểm ngữ pháp xuất hiện trong bài
+
+## Gợi ý cách học
+- 3-4 bước học hiệu quả
+
+Nội dung tài liệu gốc:
+${inputText}`;
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => {
                 controller.abort(new Error('RequestTimeout'));
             }, timeoutMs);
             try {
-                const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-pro' });
+                const model = this.genAI.getGenerativeModel({ model: modelName });
                 const result = await model.generateContent({ contents: [{ role: 'user', parts: [{ text: prompt }] }] }, { signal: controller.signal });
                 clearTimeout(timeoutId);
                 const response = result.response;
@@ -52,10 +68,14 @@ let AiService = AiService_1 = class AiService {
                     }
                 }
                 else {
+                    const is429 = error?.status === 429 || error?.message?.includes('429');
+                    if (is429) {
+                        throw new Error('Đã vượt hạn mức Gemini API (quota). Vui lòng đợi 1 phút hoặc đổi API key trong .env.');
+                    }
                     const is503 = error?.status === 503 || error?.message?.includes('503');
                     if (!is503) {
                         this.logger.error('Error calling Gemini API', error);
-                        throw new Error('Failed to summarize text using AI');
+                        throw new Error(error?.message || 'Không thể gọi Gemini API. Kiểm tra GEMINI_API_KEY trong .env.');
                     }
                     this.logger.warn(`Gemini API 503 error. Retrying in attempt ${attempt}...`);
                     if (attempt >= maxRetries) {
@@ -68,17 +88,6 @@ let AiService = AiService_1 = class AiService {
             }
         }
         throw new Error('Failed to summarize text after retries');
-    }
-    buildFallbackSummary(text) {
-        const normalized = text.replace(/\s+/g, ' ').trim();
-        const chunks = normalized
-            .split(/(?<=[.!?])\s+/)
-            .filter(Boolean)
-            .slice(0, 5);
-        if (chunks.length === 0) {
-            return '- Tai lieu chua co noi dung de tom tat.';
-        }
-        return chunks.map((chunk) => `- ${chunk}`).join('\n');
     }
 };
 exports.AiService = AiService;

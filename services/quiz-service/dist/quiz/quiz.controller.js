@@ -18,7 +18,6 @@ const quiz_service_1 = require("./quiz.service");
 const generate_quiz_dto_1 = require("./dto/generate-quiz.dto");
 const submit_quiz_dto_1 = require("./dto/submit-quiz.dto");
 let QuizController = class QuizController {
-    quizService;
     constructor(quizService) {
         this.quizService = quizService;
     }
@@ -33,6 +32,15 @@ let QuizController = class QuizController {
     }
     submitQuiz(dto) {
         return this.quizService.submitQuiz(dto.quizId, dto.userId, dto.answers);
+    }
+    listFlashcards(userId, documentId) {
+        return this.quizService.listFlashcards(userId, documentId);
+    }
+    generateFlashcards(userId, documentId) {
+        return this.quizService.generateFlashcards(documentId, userId);
+    }
+    deleteFlashcard(userId, id) {
+        return this.quizService.deleteFlashcard(userId, id);
     }
 };
 exports.QuizController = QuizController;
@@ -66,6 +74,30 @@ __decorate([
     __metadata("design:paramtypes", [submit_quiz_dto_1.SubmitQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "submitQuiz", null);
+__decorate([
+    (0, common_1.Get)('flashcards/all'),
+    __param(0, (0, common_1.Headers)('x-user-id')),
+    __param(1, (0, common_1.Query)('documentId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "listFlashcards", null);
+__decorate([
+    (0, common_1.Post)('flashcards/generate'),
+    __param(0, (0, common_1.Headers)('x-user-id')),
+    __param(1, (0, common_1.Body)('documentId')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "generateFlashcards", null);
+__decorate([
+    (0, common_1.Delete)('flashcards/:id'),
+    __param(0, (0, common_1.Headers)('x-user-id')),
+    __param(1, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, String]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "deleteFlashcard", null);
 exports.QuizController = QuizController = __decorate([
     (0, common_1.Controller)('api/quiz'),
     __metadata("design:paramtypes", [quiz_service_1.QuizService])

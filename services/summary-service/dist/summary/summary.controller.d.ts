@@ -4,23 +4,18 @@ export declare class SummaryController {
     constructor(summaryService: SummaryService);
     handleDocumentUploadedEvent(data: any): Promise<void>;
     getSummaryByDocumentId(documentId: string): Promise<{
-        success: boolean;
-        data: {
-            id: string;
-            documentId: string;
-            content: string;
-            createdAt: Date;
-        };
+        id: string;
+        documentId: string;
+        content: string;
+        createdAt: Date;
     }>;
     generateSummary(body: {
         documentId: string;
+        force?: boolean;
     }): Promise<{
-        success: boolean;
-        data: {
-            id: string;
-            documentId: string;
-            content: string;
-            createdAt: Date;
-        };
+        id: string;
+        documentId: string;
+        content: string;
+        createdAt: Date;
     }>;
 }

@@ -5,5 +5,4 @@ export declare class AiService {
     private genAI;
     constructor(configService: ConfigService);
     summarizeText(text: string): Promise<string>;
-    private buildFallbackSummary;
 }

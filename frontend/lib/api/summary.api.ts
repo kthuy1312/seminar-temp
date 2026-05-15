@@ -7,12 +7,12 @@ type SummaryEnvelope = {
 };
 
 export async function getSummaryByDocumentId(documentId: string) {
-  return apiRequest<SummaryEnvelope>(`/api/summaries/document/${documentId}`);
+  return apiRequest<SummaryItem>(`/api/summaries/document/${documentId}`);
 }
 
-export async function generateSummary(documentId: string) {
-  return apiRequest<SummaryEnvelope>("/api/summaries/generate", {
+export async function generateSummary(documentId: string, force = false) {
+  return apiRequest<SummaryItem>("/api/summaries/generate", {
     method: "POST",
-    body: { documentId },
+    body: { documentId, force },
   });
 }

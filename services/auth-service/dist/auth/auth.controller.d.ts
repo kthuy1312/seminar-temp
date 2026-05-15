@@ -1,69 +1,43 @@
 import { AuthService } from './auth.service';
-import { RegisterDto, LoginDto, RefreshTokenDto, UpdateProfileDto } from './dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
+import { RefreshTokenDto } from './dto/refresh-token.dto';
 export declare class AuthController {
     private readonly authService;
     constructor(authService: AuthService);
-    register(dto: RegisterDto): Promise<{
-        accessToken: string;
-        refreshToken: string;
-        expiresIn: string | undefined;
+    register(registerDto: RegisterDto): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
-    }>;
-    login(dto: LoginDto): Promise<{
         accessToken: string;
         refreshToken: string;
-        expiresIn: string | undefined;
+        expiresIn: string;
+    }>;
+    login(loginDto: LoginDto): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
-    }>;
-    refresh(dto: RefreshTokenDto): Promise<{
         accessToken: string;
         refreshToken: string;
-        expiresIn: string | undefined;
+        expiresIn: string;
+    }>;
+    refresh(refreshTokenDto: RefreshTokenDto): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: string;
     }>;
-    logout(dto: RefreshTokenDto): Promise<{
-        message: string;
-    }>;
-    getProfile(userId: string): Promise<{
-        id: string;
-        email: string;
-        fullName: string;
-        avatarUrl: string;
-        role: import("../entities/user.entity").UserRole;
-        createdAt: Date;
-        updatedAt: Date;
-    }>;
-    updateProfile(userId: string, dto: UpdateProfileDto): Promise<{
-        id: string;
-        email: string;
-        fullName: string;
-        avatarUrl: string;
-        role: import("../entities/user.entity").UserRole;
-        createdAt: Date;
-        updatedAt: Date;
-    }>;
+    logout(refreshTokenDto: RefreshTokenDto): Promise<void>;
+    getProfile(req: any): Promise<any>;
 }

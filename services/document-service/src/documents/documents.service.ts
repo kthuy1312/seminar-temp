@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
-import { FileTypeEnum, QueryDocumentsDto } from './dto/document.dto';
+import { FileType } from '@prisma/client';
+import { QueryDocumentsDto } from './dto/documents.dto';
 import { extname } from 'path';
 import { TextExtractorService, ExtractResult } from './text-extractor.service';
 
@@ -17,9 +18,9 @@ export class DocumentsService {
   private readonly logger = new Logger(DocumentsService.name);
 
   // Các loại file được phép ở tầng service (defence-in-depth)
-  private readonly ALLOWED_TYPES: FileTypeEnum[] = [
-    FileTypeEnum.PDF,
-    FileTypeEnum.DOCX,
+  private readonly ALLOWED_TYPES: FileType[] = [
+    FileType.pdf,
+    FileType.docx,
   ];
 
   constructor(
@@ -36,7 +37,7 @@ export class DocumentsService {
     }
 
     // Lấy extension và validate (2nd layer sau fileFilter)
-    const ext = extname(file.originalname).toLowerCase().replace('.', '') as FileTypeEnum;
+    const ext = extname(file.originalname).toLowerCase().replace('.', '') as FileType;
 
     if (!this.ALLOWED_TYPES.includes(ext)) {
       throw new BadRequestException(
@@ -133,7 +134,15 @@ export class DocumentsService {
       throw new NotFoundException(`Document với id "${id}" không tồn tại`);
     }
 
-    this.logger.log(`Extracting text for document: ${document.fileName} (id=${id})`);
+    if (document.extractedText) {
+      this.logger.log(`Using existing extracted text for document: ${id}`);
+      return {
+        text: document.extractedText,
+        charCount: document.extractedText.length,
+        lineCount: document.extractedText.split('\n').length,
+        sourceType: document.fileName.endsWith('.pdf') ? 'pdf' : 'docx'
+      };
+    }
 
     const result = await this.textExtractor.extract(document.filePath, document.fileName);
 

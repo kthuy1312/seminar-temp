@@ -17,32 +17,22 @@ let HttpExceptionFilter = HttpExceptionFilter_1 = class HttpExceptionFilter {
         const ctx = host.switchToHttp();
         const response = ctx.getResponse();
         const request = ctx.getRequest();
-        let status;
-        let message;
-        if (exception instanceof common_1.HttpException) {
-            status = exception.getStatus();
-            const exceptionResponse = exception.getResponse();
-            if (typeof exceptionResponse === 'object' && exceptionResponse !== null) {
-                const res = exceptionResponse;
-                message = res.message || exception.message;
-            }
-            else {
-                message = exception.message;
-            }
-        }
-        else {
-            status = common_1.HttpStatus.INTERNAL_SERVER_ERROR;
-            message = 'Lỗi hệ thống, vui lòng thử lại sau';
-            this.logger.error('Unhandled exception:', exception);
-        }
-        const errorResponse = {
+        const status = exception instanceof common_1.HttpException
+            ? exception.getStatus()
+            : common_1.HttpStatus.INTERNAL_SERVER_ERROR;
+        const message = exception instanceof common_1.HttpException
+            ? exception.getResponse()
+            : 'Internal server error';
+        this.logger.error(`${request.method} ${request.url} → ${status}`, exception instanceof Error ? exception.stack : String(exception));
+        response.status(status).json({
             success: false,
             statusCode: status,
-            message,
+            message: typeof message === 'object' && 'message' in message
+                ? message.message
+                : message,
             timestamp: new Date().toISOString(),
             path: request.url,
-        };
-        response.status(status).json(errorResponse);
+        });
     }
 };
 exports.HttpExceptionFilter = HttpExceptionFilter;

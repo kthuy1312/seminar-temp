@@ -17,7 +17,6 @@ const common_1 = require("@nestjs/common");
 const microservices_1 = require("@nestjs/microservices");
 const summary_service_1 = require("./summary.service");
 let SummaryController = class SummaryController {
-    summaryService;
     constructor(summaryService) {
         this.summaryService = summaryService;
     }
@@ -25,18 +24,10 @@ let SummaryController = class SummaryController {
         await this.summaryService.handleDocumentUploaded(data);
     }
     async getSummaryByDocumentId(documentId) {
-        const summary = await this.summaryService.getSummaryByDocumentId(documentId);
-        return {
-            success: true,
-            data: summary,
-        };
+        return this.summaryService.getSummaryByDocumentId(documentId);
     }
     async generateSummary(body) {
-        const summary = await this.summaryService.generateSummary(body.documentId);
-        return {
-            success: true,
-            data: summary,
-        };
+        return this.summaryService.generateSummary(body.documentId, body.force === true);
     }
 };
 exports.SummaryController = SummaryController;

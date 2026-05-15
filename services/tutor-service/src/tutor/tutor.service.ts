@@ -1,4 +1,10 @@
-import { Injectable, InternalServerErrorException, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AskDto } from './dto/ask.dto';
 import { ConfigService } from '@nestjs/config';
@@ -28,11 +34,13 @@ export class TutorService {
     const { question, documentId, conversationId } = askDto;
 
     try {
-      // 1. Fetch Summary from Summary Service
-      const summary = await this.getSummaryFromService(documentId);
-      
-      if (!summary) {
-        throw new NotFoundException(`Summary for document ${documentId} not found`);
+      // 1. Load full document text (+ optional summary)
+      const { documentText, summary } = await this.getDocumentContext(documentId);
+
+      if (!documentText?.trim()) {
+        throw new BadRequestException(
+          'Tài liệu chưa có nội dung văn bản. Hãy tải lại file PDF/DOCX hoặc vào trang Tài liệu → Tạo tóm tắt trước.',
+        );
       }
 
       // 2. Prepare Context and Prompt
@@ -62,7 +70,12 @@ export class TutorService {
       });
 
       // 4. Generate AI Answer
-      const answer = await this.generateAnswer(question, summary, conversation.messages || []);
+      const answer = await this.generateAnswer(
+        question,
+        documentText,
+        summary,
+        conversation.messages || [],
+      );
 
       // 5. Save AI Answer
       const aiMessage = await this.prisma.message.create({
@@ -80,40 +93,90 @@ export class TutorService {
 
     } catch (error) {
       this.logger.error(`Error processing ask request: ${error.message}`, error.stack);
-      if (error instanceof NotFoundException) {
+      if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
       throw new InternalServerErrorException('Failed to process question');
     }
   }
 
-  private async getSummaryFromService(documentId: string): Promise<string | null> {
+  private async getDocumentContext(documentId: string): Promise<{
+    documentText: string;
+    summary: string | null;
+  }> {
+    const documentText = await this.getDocumentText(documentId);
+    const summary = await this.getSummaryOptional(documentId);
+    return { documentText, summary };
+  }
+
+  private async getDocumentText(documentId: string): Promise<string> {
+    try {
+      const documentServiceUrl = this.configService.get<string>(
+        'DOCUMENT_SERVICE_URL',
+        'http://localhost:3003',
+      );
+      const response = await firstValueFrom(
+        this.httpService.post(
+          `${documentServiceUrl}/api/documents/${documentId}/extract`,
+        ),
+      );
+      const text =
+        response.data?.data?.text ??
+        response.data?.text ??
+        '';
+      if (text) {
+        this.logger.log(
+          `Loaded document text for ${documentId}: ${text.length} chars`,
+        );
+      }
+      return text;
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch document text for ${documentId}: ${error.message}`,
+      );
+      return '';
+    }
+  }
+
+  private async getSummaryOptional(documentId: string): Promise<string | null> {
     try {
       const summaryServiceUrl = this.configService.get<string>(
         'SUMMARY_SERVICE_URL',
         'http://localhost:3006',
       );
       const response = await firstValueFrom(
-        this.httpService.get(`${summaryServiceUrl}/api/summaries/document/${documentId}`),
+        this.httpService.get(
+          `${summaryServiceUrl}/api/summaries/document/${documentId}`,
+        ),
       );
       const summary =
         response.data?.data?.content ||
         response.data?.summary ||
         response.data?.content;
-      return summary ? summary : null;
-    } catch (error) {
-      this.logger.error(`Failed to fetch summary from Summary Service: ${error.message}`);
-      return `Tai lieu tham chieu cho document ${documentId} hien chua co ban tom tat. Hay tra loi dua tren kien thuc hoc tap tong quat va noi ro khi thong tin khong co trong tai lieu.`;
+      return summary || null;
+    } catch {
+      return null;
     }
   }
 
-  private async generateAnswer(question: string, summary: string, previousMessages: any[]): Promise<string> {
+  private truncateText(text: string, maxChars: number): string {
+    if (text.length <= maxChars) return text;
+    return `${text.slice(0, maxChars)}\n\n[... nội dung bị cắt bớt do giới hạn độ dài ...]`;
+  }
+
+  private async generateAnswer(
+    question: string,
+    documentText: string,
+    summary: string | null,
+    previousMessages: any[],
+  ): Promise<string> {
     if (!this.genAI) {
-      return this.generateFallbackAnswer(question, summary);
+      throw new InternalServerErrorException('GEMINI_API_KEY is missing. Please add it to your .env file to enable AI tutoring.');
     }
 
     try {
-      const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
+      const model = this.genAI.getGenerativeModel({ model: modelName });
 
       // Build chat history context
       let historyContext = '';
@@ -122,26 +185,36 @@ export class TutorService {
           previousMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n') + '\n\n';
       }
 
-      const prompt = `Bạn là một trợ lý AI học tập (AI Tutor) tận tâm và thông minh. Nhiệm vụ của bạn là giải đáp câu hỏi của học sinh dựa trên nội dung tóm tắt được cung cấp.
+      const docExcerpt = this.truncateText(documentText, 60000);
+      const summaryBlock = summary
+        ? `\n=== TÓM TẮT (tham khảo) ===\n"""\n${summary}\n"""\n`
+        : '';
 
-=== THÔNG TIN ĐẦU VÀO ===
-- Tóm tắt tài liệu:
+      const prompt = `Bạn là Gia sư Tiếng Anh AI. Trả lời DỰA TRÊN NỘI DUNG TÀI LIỆU GỐC bên dưới (có đủ câu hỏi bài tập nếu là file quiz).
+
+=== NỘI DUNG TÀI LIỆU GỐC ===
 """
-${summary}
+${docExcerpt}
 """
+${summaryBlock}
 ${historyContext}
 
-=== YÊU CẦU TRẢ LỜI ===
-1. CHÍNH XÁC & NGẮN GỌN: Chỉ trả lời thẳng vào trọng tâm câu hỏi, không lan man.
-2. DỄ HIỂU: Sử dụng ngôn từ đơn giản, thân thiện với người học.
-3. CÓ VÍ DỤ: Luôn đi kèm 1-2 ví dụ thực tế hoặc minh hoạ cụ thể (nếu có thể) để làm rõ ý.
-4. RÕ RÀNG: Trình bày sử dụng gạch đầu dòng hoặc đoạn văn ngắn.
-5. TRUNG THỰC: Nếu câu trả lời KHÔNG nằm trong nội dung tóm tắt, hãy ghi rõ: "Nội dung này không được đề cập trong tài liệu hiện tại, nhưng theo tôi hiểu thì..."
+=== NĂNG LỰC ===
+- Giải đáp câu hỏi trắc nghiệm / bài tập trong tài liệu (ghi rõ đáp án A/B/C/D và giải thích)
+- Giải thích ngữ pháp, sửa câu, dịch từ vựng
 
-=== CÂU HỎI HIỆN TẠI ===
-Câu hỏi: ${question}
+=== ĐỊNH DẠNG BẮT BUỘC (Markdown, dễ đọc) ===
+- Mỗi câu hỏi một block riêng: ### Câu 1, **Đáp án: B**, giải thích 2-3 câu
+- Dùng danh sách gạch đầu dòng, KHÔNG viết một đoạn văn dài liên tục
+- Tối đa 5-8 dòng giải thích mỗi câu (trừ khi user yêu cầu chi tiết hơn)
 
-Hãy đưa ra câu trả lời:`;
+=== QUY TẮC ===
+1. Ưu tiên trích dẫn đúng nội dung từ tài liệu gốc.
+2. Chỉ nói "không có trong tài liệu" khi thật sự không thấy trong phần NỘI DUNG TÀI LIỆU GỐC.
+3. Trả lời tiếng Việt; giữ nguyên câu/đáp án tiếng Anh.
+
+=== CÂU HỎI HỌC VIÊN ===
+${question}`;
 
       const result = await model.generateContent(prompt);
       const response = await result.response;
@@ -152,15 +225,7 @@ Hãy đưa ra câu trả lời:`;
     }
   }
 
-  private generateFallbackAnswer(question: string, summary: string): string {
-    return [
-      `Tom tat lien quan: ${summary.slice(0, 400)}${summary.length > 400 ? '...' : ''}`,
-      `Tra loi ngan gon cho cau hoi "${question}":`,
-      '- He thong local dang chay o che do fallback vi GEMINI_API_KEY chua duoc cau hinh.',
-      '- Ban co the cau hinh GEMINI_API_KEY de nhan cau tra loi AI day du hon.',
-      '- Dua tren ngu canh hien co, hay doi chieu cau hoi voi phan tom tat tai lieu de tiep tuc hoc.',
-    ].join('\n');
-  }
+
 
   async getHistory(userId: string, documentId?: string, skip: number = 0, take: number = 10) {
     try {

@@ -9,14 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthProxyModule = void 0;
 const common_1 = require("@nestjs/common");
 const auth_proxy_controller_1 = require("./auth-proxy.controller");
-const jwt_middleware_1 = require("../middleware/jwt.middleware");
 let AuthProxyModule = class AuthProxyModule {
-    configure(consumer) {
-        consumer
-            .apply(jwt_middleware_1.JwtMiddleware)
-            .exclude({ path: 'api/auth/register', method: common_1.RequestMethod.POST }, { path: 'api/auth/login', method: common_1.RequestMethod.POST }, { path: 'api/auth/refresh', method: common_1.RequestMethod.POST })
-            .forRoutes(auth_proxy_controller_1.AuthProxyController);
-    }
 };
 exports.AuthProxyModule = AuthProxyModule;
 exports.AuthProxyModule = AuthProxyModule = __decorate([

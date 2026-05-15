@@ -10,15 +10,16 @@ exports.SummaryModule = void 0;
 const common_1 = require("@nestjs/common");
 const summary_controller_1 = require("./summary.controller");
 const summary_service_1 = require("./summary.service");
-const ai_module_1 = require("../ai/ai.module");
+const ai_service_1 = require("../ai/ai.service");
+const prisma_service_1 = require("../prisma/prisma.service");
 let SummaryModule = class SummaryModule {
 };
 exports.SummaryModule = SummaryModule;
 exports.SummaryModule = SummaryModule = __decorate([
     (0, common_1.Module)({
-        imports: [ai_module_1.AiModule],
         controllers: [summary_controller_1.SummaryController],
-        providers: [summary_service_1.SummaryService],
+        providers: [summary_service_1.SummaryService, ai_service_1.AiService, prisma_service_1.PrismaService],
+        exports: [summary_service_1.SummaryService],
     })
 ], SummaryModule);
 //# sourceMappingURL=summary.module.js.map

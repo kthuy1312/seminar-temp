@@ -1,1 +1,1 @@
-{"version":3,"file":"goal-completed-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/goal-completed-event.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAyC;AACzC,qDAAgD;AAEhD,MAAa,qBAAsB,SAAQ,6BAAY;IAErD,OAAO,CAAU;CAClB;AAHD,sDAGC;AADC;IADC,IAAA,wBAAM,GAAE;;sDACQ"}
+{"version":3,"file":"goal-completed-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/goal-completed-event.dto.ts"],"names":[],"mappings":";;;AAAA,MAAa,qBAAqB;CAKjC;AALD,sDAKC"}

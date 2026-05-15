@@ -10,27 +10,21 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GetProgressQueryDto = void 0;
-const swagger_1 = require("@nestjs/swagger");
 const class_validator_1 = require("class-validator");
 class GetProgressQueryDto {
-    userId;
-    period = '30d';
+    constructor() {
+        this.period = '30d';
+    }
 }
 exports.GetProgressQueryDto = GetProgressQueryDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'User id (UUID)' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], GetProgressQueryDto.prototype, "userId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Aggregation window',
-        enum: ['7d', '30d', '90d'],
-        default: '30d',
-    }),
     (0, class_validator_1.IsOptional)(),
-    (0, class_validator_1.IsIn)(['7d', '30d', '90d']),
+    (0, class_validator_1.IsEnum)(['7d', '30d', '90d']),
     __metadata("design:type", String)
 ], GetProgressQueryDto.prototype, "period", void 0);
 //# sourceMappingURL=get-progress-query.dto.js.map

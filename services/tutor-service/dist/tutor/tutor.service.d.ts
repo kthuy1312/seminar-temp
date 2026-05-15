@@ -10,22 +10,24 @@ export declare class TutorService {
     private genAI;
     constructor(prisma: PrismaService, configService: ConfigService, httpService: HttpService);
     askQuestion(askDto: AskDto): Promise<{
-        conversationId: string;
+        conversationId: any;
         answer: string;
     }>;
-    private getSummaryFromService;
+    private getDocumentContext;
+    private getDocumentText;
+    private getSummaryOptional;
+    private truncateText;
     private generateAnswer;
-    private generateFallbackAnswer;
     getHistory(userId: string, documentId?: string, skip?: number, take?: number): Promise<{
         data: {
             conversationId: string;
             documentId: string;
             messages: {
-                conversationId: string;
                 id: string;
-                createdAt: Date;
                 role: string;
                 content: string;
+                createdAt: Date;
+                conversationId: string;
             }[];
         }[];
         pagination: {

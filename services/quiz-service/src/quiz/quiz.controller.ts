@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Post, Get, Body, Param, Query, Headers, Delete } from '@nestjs/common';
 import { QuizService } from './quiz.service';
 import { GenerateQuizDto } from './dto/generate-quiz.dto';
 import { SubmitQuizDto } from './dto/submit-quiz.dto';
@@ -25,5 +25,22 @@ export class QuizController {
   @Post('submit')
   submitQuiz(@Body() dto: SubmitQuizDto) {
     return this.quizService.submitQuiz(dto.quizId, dto.userId, dto.answers);
+  }
+
+  // --- Flashcard Endpoints ---
+
+  @Get('flashcards/all')
+  listFlashcards(@Headers('x-user-id') userId: string, @Query('documentId') documentId?: string) {
+    return this.quizService.listFlashcards(userId, documentId);
+  }
+
+  @Post('flashcards/generate')
+  generateFlashcards(@Headers('x-user-id') userId: string, @Body('documentId') documentId: string) {
+    return this.quizService.generateFlashcards(documentId, userId);
+  }
+
+  @Delete('flashcards/:id')
+  deleteFlashcard(@Headers('x-user-id') userId: string, @Param('id') id: string) {
+    return this.quizService.deleteFlashcard(userId, id);
   }
 }

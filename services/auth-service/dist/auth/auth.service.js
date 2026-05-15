@@ -11,169 +11,99 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
-var AuthService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.AuthService = void 0;
 const common_1 = require("@nestjs/common");
 const jwt_1 = require("@nestjs/jwt");
-const config_1 = require("@nestjs/config");
 const typeorm_1 = require("@nestjs/typeorm");
 const typeorm_2 = require("typeorm");
+const config_1 = require("@nestjs/config");
 const bcrypt = require("bcrypt");
 const uuid_1 = require("uuid");
 const user_entity_1 = require("../entities/user.entity");
 const refresh_token_entity_1 = require("../entities/refresh-token.entity");
-let AuthService = AuthService_1 = class AuthService {
+let AuthService = class AuthService {
     constructor(userRepository, refreshTokenRepository, jwtService, configService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.jwtService = jwtService;
         this.configService = configService;
-        this.logger = new common_1.Logger(AuthService_1.name);
     }
-    async register(dto) {
-        const existingUser = await this.userRepository.findOne({
-            where: { email: dto.email },
-        });
+    async register(registerDto) {
+        const { email, password, fullName } = registerDto;
+        const existingUser = await this.userRepository.findOne({ where: { email } });
         if (existingUser) {
-            throw new common_1.ConflictException('Email đã được sử dụng');
+            throw new common_1.ConflictException('Email already exists');
         }
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash(dto.password, salt);
+        const hashedPassword = await bcrypt.hash(password, 10);
         const user = this.userRepository.create({
-            email: dto.email,
+            email,
             password: hashedPassword,
-            fullName: dto.fullName,
+            fullName,
         });
-        const savedUser = await this.userRepository.save(user);
-        this.logger.log(`User registered: ${savedUser.email}`);
-        const tokens = await this.generateTokens(savedUser);
-        return {
-            user: this.sanitizeUser(savedUser),
-            ...tokens,
-        };
+        await this.userRepository.save(user);
+        return this.generateTokens(user);
     }
-    async login(dto) {
-        const user = await this.userRepository.findOne({
-            where: { email: dto.email },
+    async login(loginDto) {
+        const { email, password } = loginDto;
+        const user = await this.userRepository.findOne({ where: { email } });
+        if (!user || !(await bcrypt.compare(password, user.password))) {
+            throw new common_1.UnauthorizedException('Invalid credentials');
+        }
+        return this.generateTokens(user);
+    }
+    async refresh(token) {
+        const refreshToken = await this.refreshTokenRepository.findOne({
+            where: { token, isRevoked: false },
         });
+        if (!refreshToken || refreshToken.expiresAt < new Date()) {
+            throw new common_1.UnauthorizedException('Invalid or expired refresh token');
+        }
+        const user = await this.userRepository.findOne({ where: { id: refreshToken.userId } });
         if (!user) {
-            throw new common_1.UnauthorizedException('Email hoặc mật khẩu không đúng');
+            throw new common_1.UnauthorizedException('User not found');
         }
-        const isPasswordValid = await bcrypt.compare(dto.password, user.password);
-        if (!isPasswordValid) {
-            throw new common_1.UnauthorizedException('Email hoặc mật khẩu không đúng');
-        }
-        this.logger.log(`User logged in: ${user.email}`);
-        const tokens = await this.generateTokens(user);
-        return {
-            user: this.sanitizeUser(user),
-            ...tokens,
-        };
+        refreshToken.isRevoked = true;
+        await this.refreshTokenRepository.save(refreshToken);
+        return this.generateTokens(user);
     }
-    async refreshToken(refreshTokenValue) {
-        const storedToken = await this.refreshTokenRepository.findOne({
-            where: {
-                token: refreshTokenValue,
-                isRevoked: false,
-                expiresAt: (0, typeorm_2.MoreThan)(new Date()),
-            },
-            relations: ['user'],
-        });
-        if (!storedToken) {
-            throw new common_1.UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
+    async logout(token) {
+        const refreshToken = await this.refreshTokenRepository.findOne({ where: { token } });
+        if (refreshToken) {
+            refreshToken.isRevoked = true;
+            await this.refreshTokenRepository.save(refreshToken);
         }
-        storedToken.isRevoked = true;
-        await this.refreshTokenRepository.save(storedToken);
-        const tokens = await this.generateTokens(storedToken.user);
-        this.logger.log(`Token refreshed for user: ${storedToken.user.email}`);
-        return {
-            user: this.sanitizeUser(storedToken.user),
-            ...tokens,
-        };
-    }
-    async logout(refreshTokenValue) {
-        const result = await this.refreshTokenRepository.update({ token: refreshTokenValue, isRevoked: false }, { isRevoked: true });
-        if (result.affected === 0) {
-            throw new common_1.NotFoundException('Token không tìm thấy');
-        }
-        return { message: 'Đăng xuất thành công' };
-    }
-    async getProfile(userId) {
-        const user = await this.userRepository.findOne({
-            where: { id: userId },
-        });
-        if (!user) {
-            throw new common_1.NotFoundException('User không tồn tại');
-        }
-        return this.sanitizeUser(user);
-    }
-    async updateProfile(userId, dto) {
-        const user = await this.userRepository.findOne({
-            where: { id: userId },
-        });
-        if (!user) {
-            throw new common_1.NotFoundException('User không tồn tại');
-        }
-        if (dto.fullName !== undefined)
-            user.fullName = dto.fullName;
-        if (dto.avatarUrl !== undefined)
-            user.avatarUrl = dto.avatarUrl;
-        const updatedUser = await this.userRepository.save(user);
-        this.logger.log(`Profile updated for user: ${updatedUser.email}`);
-        return this.sanitizeUser(updatedUser);
     }
     async generateTokens(user) {
-        const payload = {
-            sub: user.id,
-            email: user.email,
-            role: user.role,
-        };
-        const accessToken = this.jwtService.sign(payload, {
+        const payload = { sub: user.id, email: user.email, role: user.role };
+        const accessToken = await this.jwtService.signAsync(payload, {
             secret: this.configService.get('jwt.accessSecret'),
             expiresIn: this.configService.get('jwt.accessExpiresIn'),
         });
-        const refreshTokenValue = (0, uuid_1.v4)();
-        const refreshExpiresIn = this.configService.get('jwt.refreshExpiresIn') || '7d';
-        const expiresAt = this.calculateExpiry(refreshExpiresIn);
+        const refreshTokenStr = (0, uuid_1.v4)();
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 7);
         const refreshToken = this.refreshTokenRepository.create({
+            token: refreshTokenStr,
             userId: user.id,
-            token: refreshTokenValue,
             expiresAt,
         });
         await this.refreshTokenRepository.save(refreshToken);
         return {
+            user: {
+                id: user.id,
+                email: user.email,
+                fullName: user.fullName,
+                role: user.role,
+            },
             accessToken,
-            refreshToken: refreshTokenValue,
+            refreshToken: refreshTokenStr,
             expiresIn: this.configService.get('jwt.accessExpiresIn'),
         };
     }
-    sanitizeUser(user) {
-        const { password, refreshTokens, ...result } = user;
-        return result;
-    }
-    calculateExpiry(duration) {
-        const now = new Date();
-        const value = parseInt(duration);
-        const unit = duration.replace(/\d+/g, '');
-        switch (unit) {
-            case 'm':
-                now.setMinutes(now.getMinutes() + value);
-                break;
-            case 'h':
-                now.setHours(now.getHours() + value);
-                break;
-            case 'd':
-                now.setDate(now.getDate() + value);
-                break;
-            default:
-                now.setDate(now.getDate() + 7);
-        }
-        return now;
-    }
 };
 exports.AuthService = AuthService;
-exports.AuthService = AuthService = AuthService_1 = __decorate([
+exports.AuthService = AuthService = __decorate([
     (0, common_1.Injectable)(),
     __param(0, (0, typeorm_1.InjectRepository)(user_entity_1.User)),
     __param(1, (0, typeorm_1.InjectRepository)(refresh_token_entity_1.RefreshToken)),

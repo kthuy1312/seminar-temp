@@ -34,8 +34,8 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">AI Study Assistant</h1>
-          <p className="mt-1 text-sm text-slate-500">Sign in to your account</p>
+          <h1 className="text-2xl font-bold text-slate-900">Trợ Lý Học Tiếng Anh AI</h1>
+          <p className="mt-1 text-sm text-slate-500">Đăng nhập vào tài khoản của bạn</p>
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
@@ -51,14 +51,14 @@ export default function LoginPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="email@vidu.com"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Password
+                Mật khẩu
               </label>
               <input
                 id="password"
@@ -83,14 +83,14 @@ export default function LoginPage() {
               disabled={isLoading || !email.trim() || !password.trim()}
               className="w-full rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
             >
-              {isLoading ? "Signing in..." : "Sign In"}
+              {isLoading ? "Đang đăng nhập..." : "Đăng Nhập"}
             </button>
           </form>
 
           <p className="mt-5 text-center text-sm text-slate-500">
-            Don&apos;t have an account?{" "}
+            Chưa có tài khoản?{" "}
             <Link href="/register" className="font-medium text-blue-600 hover:text-blue-700">
-              Sign up
+              Đăng ký ngay
             </Link>
           </p>
         </section>

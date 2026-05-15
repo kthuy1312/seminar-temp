@@ -1,6 +1,6 @@
 import { ClientProxy } from '@nestjs/microservices';
 import { PrismaService } from '../prisma/prisma.service';
-import { QueryDocumentsDto } from './dto/document.dto';
+import { QueryDocumentsDto } from './dto/documents.dto';
 import { TextExtractorService, ExtractResult } from './text-extractor.service';
 export declare class DocumentsService {
     private readonly prisma;

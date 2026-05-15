@@ -1,4 +1,11 @@
-import { Injectable, Logger, NotFoundException, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  InternalServerErrorException,
+  ServiceUnavailableException,
+  BadRequestException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AiService } from '../ai/ai.service';
 import { ConfigService } from '@nestjs/config';
@@ -70,55 +77,69 @@ export class SummaryService {
     }
   }
 
-  async generateSummary(documentId: string) {
-    // On-demand summary generation
-    this.logger.log(`Generating summary for document ${documentId} on-demand...`);
+  private extractTextFromResponse(response: { data?: unknown }): string {
+    const data = response.data as Record<string, unknown> | undefined;
+    const inner = data?.data as Record<string, unknown> | undefined;
+    return (
+      (inner?.text as string) ||
+      (data?.text as string) ||
+      ''
+    );
+  }
+
+  async generateSummary(documentId: string, force = false) {
+    this.logger.log(`Generating summary for document ${documentId} (force=${force})...`);
 
     try {
-      // Check if summary already exists
-      const existingSummary = await this.prisma.summary.findFirst({
-        where: { documentId },
-        orderBy: { createdAt: 'desc' },
-      });
-
-      if (existingSummary) {
-        this.logger.log(`Summary already exists for document ${documentId}, returning existing`);
-        return existingSummary;
+      if (!force) {
+        const existingSummary = await this.prisma.summary.findFirst({
+          where: { documentId },
+          orderBy: { createdAt: 'desc' },
+        });
+        if (existingSummary) {
+          return existingSummary;
+        }
+      } else {
+        await this.prisma.summary.deleteMany({ where: { documentId } });
       }
 
-      // Fetch document text
       const documentServiceUrl =
         this.configService.get<string>('DOCUMENT_SERVICE_URL') || 'http://localhost:3003';
       const extractResponse = await axios.post(
         `${documentServiceUrl}/api/documents/${documentId}/extract`,
+        {},
+        { timeout: 30000 },
       );
 
-      if (!extractResponse.data?.data?.text) {
-        throw new Error('No text extracted from document');
+      const textToSummarize = this.extractTextFromResponse(extractResponse);
+
+      if (!textToSummarize?.trim()) {
+        throw new BadRequestException(
+          'Không đọc được nội dung file. Hãy tải lại file PDF/DOCX hợp lệ.',
+        );
       }
 
-      const textToSummarize = extractResponse.data.data.text;
-
-      if (!textToSummarize || textToSummarize.trim() === '') {
-        throw new Error('Document has empty text');
-      }
-
-      // Generate summary using AI
       const summaryContent = await this.aiService.summarizeText(textToSummarize);
 
-      // Save summary to database
       const summary = await this.prisma.summary.create({
-        data: {
-          documentId,
-          content: summaryContent,
-        },
+        data: { documentId, content: summaryContent },
       });
 
-      this.logger.log(`Successfully generated and saved summary for document ${documentId}`);
+      this.logger.log(`Successfully generated summary for document ${documentId}`);
       return summary;
     } catch (error) {
       this.logger.error(`Failed to generate summary for document ${documentId}:`, error);
-      throw new InternalServerErrorException('Failed to generate summary');
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      if (error instanceof BadRequestException) throw error;
+      if (message.includes('quota') || message.includes('429')) {
+        throw new ServiceUnavailableException(message);
+      }
+      if (message.includes('GEMINI_API_KEY')) {
+        throw new InternalServerErrorException(message);
+      }
+      throw new InternalServerErrorException(
+        `Phân tích thất bại: ${message}`,
+      );
     }
   }
 

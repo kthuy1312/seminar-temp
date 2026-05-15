@@ -19,8 +19,8 @@ const multer_1 = require("multer");
 const path_1 = require("path");
 const uuid_1 = require("uuid");
 const documents_service_1 = require("./documents.service");
-const document_dto_1 = require("./dto/document.dto");
-const document_dto_2 = require("./dto/document.dto");
+const documents_dto_1 = require("./dto/documents.dto");
+const documents_dto_2 = require("./dto/documents.dto");
 const storage = (0, multer_1.diskStorage)({
     destination: (0, path_1.join)(process.cwd(), 'uploads'),
     filename: (_req, file, cb) => {
@@ -35,7 +35,7 @@ const ALLOWED_MIMES = new Set([
 ]);
 const fileFilter = (_req, file, cb) => {
     const ext = (0, path_1.extname)(file.originalname).toLowerCase();
-    if (!document_dto_2.ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIMES.has(file.mimetype)) {
+    if (!documents_dto_2.ALLOWED_EXTENSIONS.includes(ext) || !ALLOWED_MIMES.has(file.mimetype)) {
         return cb(new common_1.UnsupportedMediaTypeException(`Chỉ chấp nhận file PDF hoặc DOCX. Bạn upload: "${file.originalname}"`), false);
     }
     cb(null, true);
@@ -71,7 +71,7 @@ __decorate([
         storage,
         fileFilter,
         limits: {
-            fileSize: document_dto_2.MAX_FILE_SIZE_BYTES,
+            fileSize: documents_dto_2.MAX_FILE_SIZE_BYTES,
             files: 1,
         },
     })),
@@ -79,7 +79,7 @@ __decorate([
     __param(1, (0, common_1.Body)()),
     __param(2, (0, common_1.Headers)('x-user-id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [Object, document_dto_1.UploadDocumentDto, String]),
+    __metadata("design:paramtypes", [Object, documents_dto_1.UploadDocumentDto, String]),
     __metadata("design:returntype", Promise)
 ], DocumentsController.prototype, "upload", null);
 __decorate([
@@ -95,7 +95,7 @@ __decorate([
     __param(0, (0, common_1.Query)()),
     __param(1, (0, common_1.Headers)('x-user-id')),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [document_dto_1.QueryDocumentsDto, String]),
+    __metadata("design:paramtypes", [documents_dto_1.QueryDocumentsDto, String]),
     __metadata("design:returntype", Promise)
 ], DocumentsController.prototype, "findAll", null);
 __decorate([

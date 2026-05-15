@@ -7,5 +7,7 @@ export type QuizQuestion = {
 export type QuizItem = {
   id: string;
   documentId: string;
+  title?: string;
+  createdAt?: string;
   questions: QuizQuestion[];
 };

@@ -12,11 +12,10 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.GenerateQuizDto = void 0;
 const class_validator_1 = require("class-validator");
 class GenerateQuizDto {
-    documentId;
 }
 exports.GenerateQuizDto = GenerateQuizDto;
 __decorate([
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], GenerateQuizDto.prototype, "documentId", void 0);

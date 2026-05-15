@@ -35,15 +35,15 @@ export default function RegisterPage() {
     <div className="flex min-h-screen items-center justify-center bg-slate-50 px-4">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <h1 className="text-2xl font-bold text-slate-900">AI Study Assistant</h1>
-          <p className="mt-1 text-sm text-slate-500">Create your free account</p>
+          <h1 className="text-2xl font-bold text-slate-900">Trợ Lý Học Tiếng Anh AI</h1>
+          <p className="mt-1 text-sm text-slate-500">Tạo tài khoản miễn phí</p>
         </div>
 
         <section className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm">
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label htmlFor="full-name" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Full Name <span className="text-slate-400">(optional)</span>
+                Họ và Tên <span className="text-slate-400">(tùy chọn)</span>
               </label>
               <input
                 id="full-name"
@@ -51,7 +51,7 @@ export default function RegisterPage() {
                 autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Your name"
+                placeholder="Họ tên của bạn"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -67,14 +67,14 @@ export default function RegisterPage() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
+                placeholder="email@vidu.com"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="mb-1.5 block text-sm font-medium text-slate-700">
-                Password
+                Mật khẩu
               </label>
               <input
                 id="password"
@@ -84,7 +84,7 @@ export default function RegisterPage() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="At least 6 characters"
+                placeholder="Tối thiểu 6 ký tự"
                 className="w-full rounded-xl border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -100,14 +100,14 @@ export default function RegisterPage() {
               disabled={isLoading || !email.trim() || !password.trim()}
               className="w-full rounded-xl bg-blue-500 px-5 py-3 text-sm font-semibold text-white transition hover:bg-blue-600 disabled:cursor-not-allowed disabled:bg-blue-300"
             >
-              {isLoading ? "Creating account..." : "Create Account"}
+              {isLoading ? "Đang tạo tài khoản..." : "Tạo Tài Khoản"}
             </button>
           </form>
 
           <p className="mt-5 text-center text-sm text-slate-500">
-            Already have an account?{" "}
+            Đã có tài khoản?{" "}
             <Link href="/login" className="font-medium text-blue-600 hover:text-blue-700">
-              Sign in
+              Đăng nhập ngay
             </Link>
           </p>
         </section>

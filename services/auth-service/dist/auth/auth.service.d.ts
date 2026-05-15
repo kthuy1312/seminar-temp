@@ -1,80 +1,49 @@
 import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
+import { ConfigService } from '@nestjs/config';
 import { User } from '../entities/user.entity';
 import { RefreshToken } from '../entities/refresh-token.entity';
-import { RegisterDto, LoginDto, UpdateProfileDto } from './dto';
+import { RegisterDto } from './dto/register.dto';
+import { LoginDto } from './dto/login.dto';
 export declare class AuthService {
-    private readonly userRepository;
-    private readonly refreshTokenRepository;
-    private readonly jwtService;
-    private readonly configService;
-    private readonly logger;
+    private userRepository;
+    private refreshTokenRepository;
+    private jwtService;
+    private configService;
     constructor(userRepository: Repository<User>, refreshTokenRepository: Repository<RefreshToken>, jwtService: JwtService, configService: ConfigService);
-    register(dto: RegisterDto): Promise<{
-        accessToken: string;
-        refreshToken: string;
-        expiresIn: string | undefined;
+    register(registerDto: RegisterDto): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
-    }>;
-    login(dto: LoginDto): Promise<{
         accessToken: string;
         refreshToken: string;
-        expiresIn: string | undefined;
+        expiresIn: string;
+    }>;
+    login(loginDto: LoginDto): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
-    }>;
-    refreshToken(refreshTokenValue: string): Promise<{
         accessToken: string;
         refreshToken: string;
-        expiresIn: string | undefined;
+        expiresIn: string;
+    }>;
+    refresh(token: string): Promise<{
         user: {
             id: string;
             email: string;
             fullName: string;
-            avatarUrl: string;
-            role: import("../entities/user.entity").UserRole;
-            createdAt: Date;
-            updatedAt: Date;
+            role: string;
         };
+        accessToken: string;
+        refreshToken: string;
+        expiresIn: string;
     }>;
-    logout(refreshTokenValue: string): Promise<{
-        message: string;
-    }>;
-    getProfile(userId: string): Promise<{
-        id: string;
-        email: string;
-        fullName: string;
-        avatarUrl: string;
-        role: import("../entities/user.entity").UserRole;
-        createdAt: Date;
-        updatedAt: Date;
-    }>;
-    updateProfile(userId: string, dto: UpdateProfileDto): Promise<{
-        id: string;
-        email: string;
-        fullName: string;
-        avatarUrl: string;
-        role: import("../entities/user.entity").UserRole;
-        createdAt: Date;
-        updatedAt: Date;
-    }>;
+    logout(token: string): Promise<void>;
     private generateTokens;
-    private sanitizeUser;
-    private calculateExpiry;
 }

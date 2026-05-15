@@ -14,19 +14,11 @@ export class SummaryController {
 
   @Get('document/:id')
   async getSummaryByDocumentId(@Param('id') documentId: string) {
-    const summary = await this.summaryService.getSummaryByDocumentId(documentId);
-    return {
-      success: true,
-      data: summary,
-    };
+    return this.summaryService.getSummaryByDocumentId(documentId);
   }
 
   @Post('generate')
-  async generateSummary(@Body() body: { documentId: string }) {
-    const summary = await this.summaryService.generateSummary(body.documentId);
-    return {
-      success: true,
-      data: summary,
-    };
+  async generateSummary(@Body() body: { documentId: string; force?: boolean }) {
+    return this.summaryService.generateSummary(body.documentId, body.force === true);
   }
 }

@@ -10,28 +10,21 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.GetActivityQueryDto = void 0;
-const swagger_1 = require("@nestjs/swagger");
-const class_transformer_1 = require("class-transformer");
 const class_validator_1 = require("class-validator");
+const class_transformer_1 = require("class-transformer");
 class GetActivityQueryDto {
-    userId;
-    limit = 20;
-    offset = 0;
+    constructor() {
+        this.limit = 20;
+        this.offset = 0;
+    }
 }
 exports.GetActivityQueryDto = GetActivityQueryDto;
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({ description: 'Filter by user id (UUID)' }),
     (0, class_validator_1.IsOptional)(),
     (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], GetActivityQueryDto.prototype, "userId", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Number of records to return',
-        default: 20,
-        minimum: 1,
-        maximum: 100,
-    }),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),
@@ -40,11 +33,6 @@ __decorate([
     __metadata("design:type", Number)
 ], GetActivityQueryDto.prototype, "limit", void 0);
 __decorate([
-    (0, swagger_1.ApiPropertyOptional)({
-        description: 'Pagination offset',
-        default: 0,
-        minimum: 0,
-    }),
     (0, class_validator_1.IsOptional)(),
     (0, class_transformer_1.Type)(() => Number),
     (0, class_validator_1.IsInt)(),

@@ -4,7 +4,7 @@ export declare class TutorController {
     private readonly tutorService;
     constructor(tutorService: TutorService);
     askQuestion(askDto: AskDto): Promise<{
-        conversationId: string;
+        conversationId: any;
         answer: string;
     }>;
     getHistory(userId: string, documentId?: string, skip?: string, take?: string): Promise<{

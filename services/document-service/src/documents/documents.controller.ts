@@ -20,11 +20,11 @@ import { extname, join } from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { Request } from 'express';
 import { DocumentsService } from './documents.service';
-import { QueryDocumentsDto, UploadDocumentDto } from './dto/document.dto';
+import { QueryDocumentsDto, UploadDocumentDto } from './dto/documents.dto';
 import {
   ALLOWED_EXTENSIONS,
   MAX_FILE_SIZE_BYTES,
-} from './dto/document.dto';
+} from './dto/documents.dto';
 
 // ─── Multer — Disk Storage ────────────────────────────────────
 

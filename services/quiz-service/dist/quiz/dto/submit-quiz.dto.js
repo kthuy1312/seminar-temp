@@ -12,23 +12,21 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.SubmitQuizDto = void 0;
 const class_validator_1 = require("class-validator");
 class SubmitQuizDto {
-    quizId;
-    userId;
-    answers;
 }
 exports.SubmitQuizDto = SubmitQuizDto;
 __decorate([
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], SubmitQuizDto.prototype, "quizId", void 0);
 __decorate([
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], SubmitQuizDto.prototype, "userId", void 0);
 __decorate([
     (0, class_validator_1.IsObject)(),
+    (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", Object)
 ], SubmitQuizDto.prototype, "answers", void 0);
 //# sourceMappingURL=submit-quiz.dto.js.map

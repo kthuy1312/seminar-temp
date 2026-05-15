@@ -17,7 +17,7 @@ exports.DocumentsService = void 0;
 const common_1 = require("@nestjs/common");
 const microservices_1 = require("@nestjs/microservices");
 const prisma_service_1 = require("../prisma/prisma.service");
-const document_dto_1 = require("./dto/document.dto");
+const client_1 = require("@prisma/client");
 const path_1 = require("path");
 const text_extractor_service_1 = require("./text-extractor.service");
 let DocumentsService = DocumentsService_1 = class DocumentsService {
@@ -27,8 +27,8 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
         this.rabbitClient = rabbitClient;
         this.logger = new common_1.Logger(DocumentsService_1.name);
         this.ALLOWED_TYPES = [
-            document_dto_1.FileTypeEnum.PDF,
-            document_dto_1.FileTypeEnum.DOCX,
+            client_1.FileType.pdf,
+            client_1.FileType.docx,
         ];
     }
     async upload(file, userId) {
@@ -95,7 +95,15 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
         if (!document) {
             throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
         }
-        this.logger.log(`Extracting text for document: ${document.fileName} (id=${id})`);
+        if (document.extractedText) {
+            this.logger.log(`Using existing extracted text for document: ${id}`);
+            return {
+                text: document.extractedText,
+                charCount: document.extractedText.length,
+                lineCount: document.extractedText.split('\n').length,
+                sourceType: document.fileName.endsWith('.pdf') ? 'pdf' : 'docx'
+            };
+        }
         const result = await this.textExtractor.extract(document.filePath, document.fileName);
         await this.prisma.document.update({
             where: { id },

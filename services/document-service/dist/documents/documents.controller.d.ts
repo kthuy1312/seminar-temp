@@ -1,5 +1,5 @@
 import { DocumentsService } from './documents.service';
-import { QueryDocumentsDto, UploadDocumentDto } from './dto/document.dto';
+import { QueryDocumentsDto, UploadDocumentDto } from './dto/documents.dto';
 export declare class DocumentsController {
     private readonly documentsService;
     constructor(documentsService: DocumentsService);

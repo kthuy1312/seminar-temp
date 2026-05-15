@@ -8,9 +8,6 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 var SummaryService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.SummaryService = void 0;
@@ -18,16 +15,13 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const ai_service_1 = require("../ai/ai.service");
 const config_1 = require("@nestjs/config");
-const axios_1 = __importDefault(require("axios"));
+const axios_1 = require("axios");
 let SummaryService = SummaryService_1 = class SummaryService {
-    prisma;
-    aiService;
-    configService;
-    logger = new common_1.Logger(SummaryService_1.name);
     constructor(prisma, aiService, configService) {
         this.prisma = prisma;
         this.aiService = aiService;
         this.configService = configService;
+        this.logger = new common_1.Logger(SummaryService_1.name);
     }
     async handleDocumentUploaded(payload) {
         const { document_id, extracted_text } = payload;
@@ -76,39 +70,53 @@ let SummaryService = SummaryService_1 = class SummaryService {
             this.logger.error(`Failed to save summary to DB for document ${document_id}`, error);
         }
     }
-    async generateSummary(documentId) {
-        this.logger.log(`Generating summary for document ${documentId} on-demand...`);
+    extractTextFromResponse(response) {
+        const data = response.data;
+        const inner = data?.data;
+        return (inner?.text ||
+            data?.text ||
+            '');
+    }
+    async generateSummary(documentId, force = false) {
+        this.logger.log(`Generating summary for document ${documentId} (force=${force})...`);
         try {
-            const existingSummary = await this.prisma.summary.findFirst({
-                where: { documentId },
-                orderBy: { createdAt: 'desc' },
-            });
-            if (existingSummary) {
-                this.logger.log(`Summary already exists for document ${documentId}, returning existing`);
-                return existingSummary;
+            if (!force) {
+                const existingSummary = await this.prisma.summary.findFirst({
+                    where: { documentId },
+                    orderBy: { createdAt: 'desc' },
+                });
+                if (existingSummary) {
+                    return existingSummary;
+                }
+            }
+            else {
+                await this.prisma.summary.deleteMany({ where: { documentId } });
             }
             const documentServiceUrl = this.configService.get('DOCUMENT_SERVICE_URL') || 'http://localhost:3003';
-            const extractResponse = await axios_1.default.post(`${documentServiceUrl}/api/documents/${documentId}/extract`);
-            if (!extractResponse.data?.data?.text) {
-                throw new Error('No text extracted from document');
-            }
-            const textToSummarize = extractResponse.data.data.text;
-            if (!textToSummarize || textToSummarize.trim() === '') {
-                throw new Error('Document has empty text');
+            const extractResponse = await axios_1.default.post(`${documentServiceUrl}/api/documents/${documentId}/extract`, {}, { timeout: 30000 });
+            const textToSummarize = this.extractTextFromResponse(extractResponse);
+            if (!textToSummarize?.trim()) {
+                throw new common_1.BadRequestException('Không đọc được nội dung file. Hãy tải lại file PDF/DOCX hợp lệ.');
             }
             const summaryContent = await this.aiService.summarizeText(textToSummarize);
             const summary = await this.prisma.summary.create({
-                data: {
-                    documentId,
-                    content: summaryContent,
-                },
+                data: { documentId, content: summaryContent },
             });
-            this.logger.log(`Successfully generated and saved summary for document ${documentId}`);
+            this.logger.log(`Successfully generated summary for document ${documentId}`);
             return summary;
         }
         catch (error) {
             this.logger.error(`Failed to generate summary for document ${documentId}:`, error);
-            throw new common_1.InternalServerErrorException('Failed to generate summary');
+            const message = error instanceof Error ? error.message : 'Unknown error';
+            if (error instanceof common_1.BadRequestException)
+                throw error;
+            if (message.includes('quota') || message.includes('429')) {
+                throw new common_1.ServiceUnavailableException(message);
+            }
+            if (message.includes('GEMINI_API_KEY')) {
+                throw new common_1.InternalServerErrorException(message);
+            }
+            throw new common_1.InternalServerErrorException(`Phân tích thất bại: ${message}`);
         }
     }
     async getSummaryByDocumentId(documentId) {

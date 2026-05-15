@@ -17,7 +17,6 @@ const common_1 = require("@nestjs/common");
 const tutor_service_1 = require("./tutor.service");
 const ask_dto_1 = require("./dto/ask.dto");
 let TutorController = class TutorController {
-    tutorService;
     constructor(tutorService) {
         this.tutorService = tutorService;
     }

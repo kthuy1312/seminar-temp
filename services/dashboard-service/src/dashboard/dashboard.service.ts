@@ -20,8 +20,7 @@ export class DashboardService {
 
   async getStats(userId?: string) {
     if (userId) {
-      const stats = await this.ensureUserStats(userId);
-      return { success: true, data: stats };
+      return this.ensureUserStats(userId);
     }
 
     const [totalUsers, totals] = await Promise.all([
@@ -41,19 +40,16 @@ export class DashboardService {
     ]);
 
     return {
-      success: true,
-      data: {
-        totalUsers,
-        totals: {
-          totalGoals: totals._sum.totalGoals ?? 0,
-          completedGoals: totals._sum.completedGoals ?? 0,
-          totalDocuments: totals._sum.totalDocuments ?? 0,
-          totalQuizzes: totals._sum.totalQuizzes ?? 0,
-        },
-        averages: {
-          avgQuizScore: Number(totals._avg.avgQuizScore ?? 0),
-          avgStudyStreak: Number(totals._avg.studyStreak ?? 0),
-        },
+      totalUsers,
+      totals: {
+        totalGoals: totals._sum.totalGoals ?? 0,
+        completedGoals: totals._sum.completedGoals ?? 0,
+        totalDocuments: totals._sum.totalDocuments ?? 0,
+        totalQuizzes: totals._sum.totalQuizzes ?? 0,
+      },
+      averages: {
+        avgQuizScore: Number(totals._avg.avgQuizScore ?? 0),
+        avgStudyStreak: Number(totals._avg.studyStreak ?? 0),
       },
     };
   }
@@ -72,7 +68,6 @@ export class DashboardService {
     ]);
 
     return {
-      success: true,
       data: items,
       pagination: {
         total,
@@ -127,13 +122,10 @@ export class DashboardService {
       progressByDay.set(dateKey, current);
     }
 
-    return {
-      success: true,
-      data: Array.from(progressByDay.entries()).map(([date, metrics]) => ({
-        date,
-        ...metrics,
-      })),
-    };
+    return Array.from(progressByDay.entries()).map(([date, metrics]) => ({
+      date,
+      ...metrics,
+    }));
   }
 
   async handleUserCreated(payload: UserCreatedEventDto) {
@@ -257,7 +249,6 @@ export class DashboardService {
       this.logger.log(
         `Quiz completed aggregated for user ${payload.user_id}, quiz ${payload.quiz_id}`,
       );
-      this.logger.debug(`Previous total quizzes: ${stats.totalQuizzes}`);
     });
   }
 

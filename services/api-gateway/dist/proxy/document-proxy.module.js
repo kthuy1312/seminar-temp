@@ -9,13 +9,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.DocumentProxyModule = void 0;
 const common_1 = require("@nestjs/common");
 const document_proxy_controller_1 = require("./document-proxy.controller");
-const jwt_middleware_1 = require("../middleware/jwt.middleware");
 let DocumentProxyModule = class DocumentProxyModule {
-    configure(consumer) {
-        consumer
-            .apply(jwt_middleware_1.JwtMiddleware)
-            .forRoutes(document_proxy_controller_1.DocumentProxyController);
-    }
 };
 exports.DocumentProxyModule = DocumentProxyModule;
 exports.DocumentProxyModule = DocumentProxyModule = __decorate([

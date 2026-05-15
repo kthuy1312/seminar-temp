@@ -15,15 +15,13 @@ const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const dashboard_actions_1 = require("./constants/dashboard-actions");
 let DashboardService = DashboardService_1 = class DashboardService {
-    prisma;
-    logger = new common_1.Logger(DashboardService_1.name);
     constructor(prisma) {
         this.prisma = prisma;
+        this.logger = new common_1.Logger(DashboardService_1.name);
     }
     async getStats(userId) {
         if (userId) {
-            const stats = await this.ensureUserStats(userId);
-            return { success: true, data: stats };
+            return this.ensureUserStats(userId);
         }
         const [totalUsers, totals] = await Promise.all([
             this.prisma.userStats.count(),
@@ -41,19 +39,16 @@ let DashboardService = DashboardService_1 = class DashboardService {
             }),
         ]);
         return {
-            success: true,
-            data: {
-                totalUsers,
-                totals: {
-                    totalGoals: totals._sum.totalGoals ?? 0,
-                    completedGoals: totals._sum.completedGoals ?? 0,
-                    totalDocuments: totals._sum.totalDocuments ?? 0,
-                    totalQuizzes: totals._sum.totalQuizzes ?? 0,
-                },
-                averages: {
-                    avgQuizScore: Number(totals._avg.avgQuizScore ?? 0),
-                    avgStudyStreak: Number(totals._avg.studyStreak ?? 0),
-                },
+            totalUsers,
+            totals: {
+                totalGoals: totals._sum.totalGoals ?? 0,
+                completedGoals: totals._sum.completedGoals ?? 0,
+                totalDocuments: totals._sum.totalDocuments ?? 0,
+                totalQuizzes: totals._sum.totalQuizzes ?? 0,
+            },
+            averages: {
+                avgQuizScore: Number(totals._avg.avgQuizScore ?? 0),
+                avgStudyStreak: Number(totals._avg.studyStreak ?? 0),
             },
         };
     }
@@ -69,7 +64,6 @@ let DashboardService = DashboardService_1 = class DashboardService {
             this.prisma.activityLog.count({ where }),
         ]);
         return {
-            success: true,
             data: items,
             pagination: {
                 total,
@@ -115,13 +109,10 @@ let DashboardService = DashboardService_1 = class DashboardService {
             }
             progressByDay.set(dateKey, current);
         }
-        return {
-            success: true,
-            data: Array.from(progressByDay.entries()).map(([date, metrics]) => ({
-                date,
-                ...metrics,
-            })),
-        };
+        return Array.from(progressByDay.entries()).map(([date, metrics]) => ({
+            date,
+            ...metrics,
+        }));
     }
     async handleUserCreated(payload) {
         const occurredAt = this.resolveOccurredAt(payload.occurred_at);
@@ -205,7 +196,6 @@ let DashboardService = DashboardService_1 = class DashboardService {
             });
             await this.createActivity(tx, payload.user_id, dashboard_actions_1.DASHBOARD_ACTIONS.QUIZ_COMPLETED, this.toJson(payload), occurredAt);
             this.logger.log(`Quiz completed aggregated for user ${payload.user_id}, quiz ${payload.quiz_id}`);
-            this.logger.debug(`Previous total quizzes: ${stats.totalQuizzes}`);
         });
     }
     async handleRoadmapStepCompleted(payload) {

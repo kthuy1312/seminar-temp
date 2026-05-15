@@ -1,4 +1,6 @@
-import { BaseEventDto } from './base-event.dto';
-export declare class GoalCreatedEventDto extends BaseEventDto {
+export declare class GoalCreatedEventDto {
+    user_id: string;
     goal_id: string;
+    title: string;
+    occurred_at?: string;
 }

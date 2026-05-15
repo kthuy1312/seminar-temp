@@ -8,7 +8,8 @@ export declare class SummaryService {
     private readonly logger;
     constructor(prisma: PrismaService, aiService: AiService, configService: ConfigService);
     handleDocumentUploaded(payload: any): Promise<void>;
-    generateSummary(documentId: string): Promise<{
+    private extractTextFromResponse;
+    generateSummary(documentId: string, force?: boolean): Promise<{
         id: string;
         documentId: string;
         content: string;

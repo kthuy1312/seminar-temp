@@ -14,5 +14,6 @@ export async function sendTutorMessage(payload: {
 
 export async function getTutorHistory(documentId?: string) {
   const params = documentId ? `?documentId=${documentId}` : "";
-  return apiRequest<TutorChatResponse[]>(`/api/tutor/history${params}`);
+  const response = await apiRequest<{ data: TutorChatResponse[] }>(`/api/tutor/history${params}`);
+  return response.data || [];
 }

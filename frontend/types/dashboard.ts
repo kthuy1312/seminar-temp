@@ -14,6 +14,8 @@ export type DashboardOverview = {
   stats: DashboardStat[];
   nextTasks: DashboardTask[];
   suggestions: string[];
+  skillProgress?: string;
+  avgQuizScore?: number;
 };
 
 export type DashboardActivity = {

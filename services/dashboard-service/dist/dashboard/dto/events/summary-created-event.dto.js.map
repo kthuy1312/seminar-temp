@@ -1,1 +1,1 @@
-{"version":3,"file":"summary-created-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/summary-created-event.dto.ts"],"names":[],"mappings":";;;;;;;;;;;;AAAA,qDAAyC;AACzC,qDAAgD;AAEhD,MAAa,sBAAuB,SAAQ,6BAAY;IAEtD,UAAU,CAAU;IAGpB,WAAW,CAAU;CACtB;AAND,wDAMC;AAJC;IADC,IAAA,wBAAM,GAAE;;0DACW;AAGpB;IADC,IAAA,wBAAM,GAAE;;2DACY"}
+{"version":3,"file":"summary-created-event.dto.js","sourceRoot":"","sources":["../../../../src/dashboard/dto/events/summary-created-event.dto.ts"],"names":[],"mappings":";;;AAAA,MAAa,sBAAsB;CAKlC;AALD,wDAKC"}

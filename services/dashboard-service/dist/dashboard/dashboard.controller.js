@@ -19,8 +19,11 @@ const dashboard_service_1 = require("./dashboard.service");
 const get_activity_query_dto_1 = require("./dto/get-activity-query.dto");
 const get_progress_query_dto_1 = require("./dto/get-progress-query.dto");
 const get_stats_query_dto_1 = require("./dto/get-stats-query.dto");
+const goal_created_event_dto_1 = require("./dto/events/goal-created-event.dto");
+const goal_completed_event_dto_1 = require("./dto/events/goal-completed-event.dto");
+const document_uploaded_event_dto_1 = require("./dto/events/document-uploaded-event.dto");
+const quiz_completed_event_dto_1 = require("./dto/events/quiz-completed-event.dto");
 let DashboardController = class DashboardController {
-    dashboardService;
     constructor(dashboardService) {
         this.dashboardService = dashboardService;
     }
@@ -38,6 +41,18 @@ let DashboardController = class DashboardController {
             ...query,
             userId: query.userId || headerUserId,
         });
+    }
+    handleGoalCreated(payload) {
+        return this.dashboardService.handleGoalCreated(payload);
+    }
+    handleGoalCompleted(payload) {
+        return this.dashboardService.handleGoalCompleted(payload);
+    }
+    handleDocumentUploaded(payload) {
+        return this.dashboardService.handleDocumentUploaded(payload);
+    }
+    handleQuizCompleted(payload) {
+        return this.dashboardService.handleQuizCompleted(payload);
     }
 };
 exports.DashboardController = DashboardController;
@@ -69,6 +84,34 @@ __decorate([
     __metadata("design:paramtypes", [get_progress_query_dto_1.GetProgressQueryDto, String]),
     __metadata("design:returntype", void 0)
 ], DashboardController.prototype, "getProgress", null);
+__decorate([
+    (0, common_1.Post)('events/goal-created'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [goal_created_event_dto_1.GoalCreatedEventDto]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "handleGoalCreated", null);
+__decorate([
+    (0, common_1.Post)('events/goal-completed'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [goal_completed_event_dto_1.GoalCompletedEventDto]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "handleGoalCompleted", null);
+__decorate([
+    (0, common_1.Post)('events/document-uploaded'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [document_uploaded_event_dto_1.DocumentUploadedEventDto]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "handleDocumentUploaded", null);
+__decorate([
+    (0, common_1.Post)('events/quiz-completed'),
+    __param(0, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [quiz_completed_event_dto_1.QuizCompletedEventDto]),
+    __metadata("design:returntype", void 0)
+], DashboardController.prototype, "handleQuizCompleted", null);
 exports.DashboardController = DashboardController = __decorate([
     (0, swagger_1.ApiTags)('dashboard'),
     (0, common_1.Controller)('dashboard'),

@@ -12,9 +12,6 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.AskDto = void 0;
 const class_validator_1 = require("class-validator");
 class AskDto {
-    question;
-    documentId;
-    conversationId;
 }
 exports.AskDto = AskDto;
 __decorate([
@@ -23,13 +20,13 @@ __decorate([
     __metadata("design:type", String)
 ], AskDto.prototype, "question", void 0);
 __decorate([
-    (0, class_validator_1.IsString)(),
+    (0, class_validator_1.IsUUID)(),
     (0, class_validator_1.IsNotEmpty)(),
     __metadata("design:type", String)
 ], AskDto.prototype, "documentId", void 0);
 __decorate([
-    (0, class_validator_1.IsString)(),
     (0, class_validator_1.IsOptional)(),
+    (0, class_validator_1.IsUUID)(),
     __metadata("design:type", String)
 ], AskDto.prototype, "conversationId", void 0);
 //# sourceMappingURL=ask.dto.js.map
