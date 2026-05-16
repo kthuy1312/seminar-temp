@@ -12,7 +12,7 @@ $services = @(
     "services/tutor-service"
 )
 
-$root = "d:\Documents\Seminar\seminar-temp"
+$root = (Get-Item $MyInvocation.MyCommand.Path).Directory.Parent.FullName
 
 foreach ($service in $services) {
     $path = Join-Path $root $service

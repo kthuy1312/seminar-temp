@@ -13,8 +13,8 @@ export class QuizController {
   }
 
   @Post('generate')
-  generateQuiz(@Body() dto: GenerateQuizDto) {
-    return this.quizService.generateQuiz(dto.documentId);
+  generateQuiz(@Headers('x-user-id') userId: string, @Body() dto: GenerateQuizDto) {
+    return this.quizService.generateQuiz(dto.documentId, userId);
   }
 
   @Get(':id')
@@ -25,6 +25,11 @@ export class QuizController {
   @Post('submit')
   submitQuiz(@Body() dto: SubmitQuizDto) {
     return this.quizService.submitQuiz(dto.quizId, dto.userId, dto.answers);
+  }
+
+  @Delete(':id')
+  deleteQuiz(@Param('id') id: string) {
+    return this.quizService.deleteQuiz(id);
   }
 
   // --- Flashcard Endpoints ---

@@ -30,7 +30,7 @@ import {
 
 const WORKFLOW_STEPS = [
   { step: 1, title: "Tải tài liệu", desc: "PDF hoặc DOCX tiếng Anh" },
-  { step: 2, title: "AI phân tích", desc: "Tóm tắt từ vựng & câu hỏi" },
+  { step: 2, title: "Xử lý tự động", desc: "Trích xuất & cache AI một lần" },
   { step: 3, title: "Học & luyện", desc: "Gia sư, Quiz, Flashcard" },
 ];
 
@@ -76,7 +76,9 @@ export default function DocumentsPage() {
   }, [documents, searchQuery, filterCategory, tick]);
 
   const stats = useMemo(() => {
-    const analyzed = documents.filter((d) => isDocumentAnalyzed(d.id)).length;
+    const analyzed = documents.filter(
+      (d) => d.status === "READY" || d.hasAiAnalysis || isDocumentAnalyzed(d.id),
+    ).length;
     return { total: documents.length, analyzed, pending: documents.length - analyzed };
   }, [documents, tick]);
 
@@ -98,7 +100,7 @@ export default function DocumentsPage() {
         saveDocumentCategory(docId, uploadCategory);
         setShowUploadModal(false);
         setSelectedFile(null);
-        router.push(`/documents/${docId}?analyze=1`);
+        router.push(`/documents/${docId}`);
         return;
       }
 
@@ -158,8 +160,8 @@ export default function DocumentsPage() {
       {/* Stats */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <StatCard label="Tổng tài liệu" value={stats.total} />
-        <StatCard label="Đã phân tích AI" value={stats.analyzed} accent="text-emerald-600" />
-        <StatCard label="Chờ phân tích" value={stats.pending} accent="text-amber-600" />
+        <StatCard label="Đã xử lý" value={stats.analyzed} accent="text-emerald-600" />
+        <StatCard label="Đang chờ" value={stats.pending} accent="text-amber-600" />
         <StatCard label="Định dạng" value="PDF · DOCX" small />
       </div>
 
@@ -224,7 +226,9 @@ export default function DocumentsPage() {
 
 function DocumentCard({ doc }: { doc: DocumentItem }) {
   const category = getCategoryMeta(getDocumentCategory(doc.id));
-  const analyzed = isDocumentAnalyzed(doc.id);
+  const analyzed =
+    doc.status === "READY" || doc.hasAiAnalysis || isDocumentAnalyzed(doc.id);
+  const processing = doc.status === "PROCESSING" || doc.status === "UPLOADING";
   const isPdf = doc.fileType === "pdf";
 
   return (
@@ -259,63 +263,25 @@ function DocumentCard({ doc }: { doc: DocumentItem }) {
         </p>
 
         <div className="mt-4 flex items-center gap-2">
-          {analyzed ? (
+          {processing ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[10px] font-bold text-blue-700">
+              <ClockIcon className="h-3.5 w-3.5" />
+              Đang xử lý
+            </span>
+          ) : analyzed ? (
             <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-bold text-emerald-700">
               <CheckCircleIcon className="h-3.5 w-3.5" />
-              Đã phân tích
+              Sẵn sàng
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700">
               <ClockIcon className="h-3.5 w-3.5" />
-              Chờ phân tích
+              Chờ xử lý
             </span>
           )}
         </div>
       </Link>
-
-      <div className="grid grid-cols-3 gap-1 border-t border-slate-100 p-2">
-        <QuickLink
-          href={`/documents/${doc.id}`}
-          icon={SparklesIcon}
-          label="Phân tích"
-          className="text-blue-600 hover:bg-blue-50"
-        />
-        <QuickLink
-          href={`/tutor?documentId=${doc.id}`}
-          icon={ChatBubbleLeftRightIcon}
-          label="Gia sư"
-          className="text-violet-600 hover:bg-violet-50"
-        />
-        <QuickLink
-          href={`/practice?documentId=${doc.id}&tab=quiz`}
-          icon={PuzzlePieceIcon}
-          label="Quiz"
-          className="text-orange-600 hover:bg-orange-50"
-        />
-      </div>
     </article>
-  );
-}
-
-function QuickLink({
-  href,
-  icon: Icon,
-  label,
-  className,
-}: {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  className: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`flex flex-col items-center gap-1 rounded-lg py-2 text-[10px] font-bold transition ${className}`}
-    >
-      <Icon className="h-4 w-4" />
-      {label}
-    </Link>
   );
 }
 
@@ -507,7 +473,7 @@ function UploadModal({
             disabled={!selectedFile || isUploading}
             className="flex-[2] rounded-xl bg-blue-600 py-3 text-sm font-bold text-white disabled:opacity-50"
           >
-            {isUploading ? "Đang tải lên..." : "Tải lên & phân tích AI"}
+            {isUploading ? "Đang tải lên..." : "Tải lên (xử lý tự động)"}
           </button>
         </div>
       </div>

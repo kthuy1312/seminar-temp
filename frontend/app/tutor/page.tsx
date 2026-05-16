@@ -275,7 +275,7 @@ function TutorContent() {
             </button>
           </form>
           <p className="mt-3 text-center text-[10px] font-bold uppercase tracking-widest text-slate-400">
-            Hỗ trợ bởi Gemini 1.5 Pro &bull; Nội dung do AI tạo ra
+            Gia sư AI (Gemini realtime) &bull; Cấu hình model qua GEMINI_MODEL trên server
           </p>
         </footer>
       </section>

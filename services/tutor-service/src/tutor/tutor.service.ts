@@ -1,7 +1,6 @@
 import {
   BadRequestException,
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
@@ -11,11 +10,17 @@ import { ConfigService } from '@nestjs/config';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
+import { classifyGeminiError, userFacingGeminiHint } from './gemini-error.util';
+
+interface TextChunk {
+  index: number;
+  text: string;
+}
 
 @Injectable()
 export class TutorService {
   private readonly logger = new Logger(TutorService.name);
-  private genAI: GoogleGenerativeAI;
+  private genAI: GoogleGenerativeAI | null = null;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -23,10 +28,15 @@ export class TutorService {
     private readonly httpService: HttpService,
   ) {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
-    if (!apiKey) {
-      this.logger.warn('GEMINI_API_KEY is not configured');
-    } else {
+    const model =
+      this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash-lite';
+    if (apiKey) {
       this.genAI = new GoogleGenerativeAI(apiKey);
+      this.logger.log(
+        `[tutor] Gemini ready model=${model} key=...${apiKey.slice(-6)}`,
+      );
+    } else {
+      this.logger.warn('[tutor] GEMINI_API_KEY is not configured');
     }
   }
 
@@ -34,16 +44,15 @@ export class TutorService {
     const { question, documentId, conversationId } = askDto;
 
     try {
-      // 1. Load full document text (+ optional summary)
-      const { documentText, summary } = await this.getDocumentContext(documentId);
+      const { documentText, summary, chunks, aiSource } =
+        await this.getDocumentContext(documentId);
 
       if (!documentText?.trim()) {
         throw new BadRequestException(
-          'Tài liệu chưa có nội dung văn bản. Hãy tải lại file PDF/DOCX hoặc vào trang Tài liệu → Tạo tóm tắt trước.',
+          'Tài liệu chưa có nội dung văn bản. Hãy tải lại file PDF/DOCX/TXT.',
         );
       }
 
-      // 2. Prepare Context and Prompt
       let conversation;
       if (conversationId) {
         conversation = await this.prisma.conversation.findUnique({
@@ -60,7 +69,6 @@ export class TutorService {
         });
       }
 
-      // 3. Save User Message
       await this.prisma.message.create({
         data: {
           conversationId: conversation.id,
@@ -69,15 +77,22 @@ export class TutorService {
         },
       });
 
-      // 4. Generate AI Answer
-      const answer = await this.generateAnswer(
+      const relevantChunks = this.selectChunks(chunks, question, documentText);
+      const { answer, usedFallback, fallbackHint } = await this.generateAnswer(
         question,
         documentText,
         summary,
+        relevantChunks,
         conversation.messages || [],
+        aiSource,
       );
 
-      // 5. Save AI Answer
+      if (usedFallback) {
+        this.logger.warn(
+          `[tutor] fallback activated document=${documentId} aiSource=${aiSource ?? 'none'}`,
+        );
+      }
+
       const aiMessage = await this.prisma.message.create({
         data: {
           conversationId: conversation.id,
@@ -89,24 +104,65 @@ export class TutorService {
       return {
         conversationId: conversation.id,
         answer: aiMessage.content,
+        fallback: usedFallback,
+        fallbackHint: usedFallback ? fallbackHint : undefined,
+        model:
+          this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash',
       };
-
-    } catch (error) {
-      this.logger.error(`Error processing ask request: ${error.message}`, error.stack);
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[tutor] ask failed: ${message}`);
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
-      throw new InternalServerErrorException('Failed to process question');
+      return {
+        conversationId: askDto.conversationId ?? null,
+        answer:
+          'AI hiện đang bận hoặc hết quota. Hệ thống đang sử dụng chế độ xử lý cục bộ. ' +
+          'Bạn vẫn có thể đọc nội dung tài liệu và thử lại sau.',
+        fallback: true,
+      };
     }
   }
 
-  private async getDocumentContext(documentId: string): Promise<{
-    documentText: string;
-    summary: string | null;
-  }> {
-    const documentText = await this.getDocumentText(documentId);
-    const summary = await this.getSummaryOptional(documentId);
-    return { documentText, summary };
+  private async getDocumentContext(documentId: string) {
+    const documentServiceUrl = this.configService.get<string>(
+      'DOCUMENT_SERVICE_URL',
+      'http://localhost:3003',
+    );
+
+    let documentText = '';
+    let summary: string | null = null;
+    let chunks: TextChunk[] = [];
+    let aiSource: string | null = null;
+
+    try {
+      const res = await firstValueFrom(
+        this.httpService.get(`${documentServiceUrl}/api/documents/${documentId}`),
+      );
+      const doc = res.data?.data ?? res.data;
+      documentText =
+        doc?.processedContent ?? doc?.extractedText ?? doc?.rawText ?? '';
+      summary = doc?.aiAnalysis?.summary ?? null;
+      chunks = (doc?.chunks as TextChunk[]) ?? [];
+      aiSource = doc?.aiSource ?? null;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[tutor] document fetch failed: ${message}`);
+    }
+
+    if (!documentText?.trim()) {
+      documentText = await this.getDocumentText(documentId);
+    }
+
+    if (!summary) {
+      summary = await this.getSummaryOptional(documentId);
+    }
+
+    return { documentText, summary, chunks, aiSource };
   }
 
   private async getDocumentText(documentId: string): Promise<string> {
@@ -120,20 +176,8 @@ export class TutorService {
           `${documentServiceUrl}/api/documents/${documentId}/extract`,
         ),
       );
-      const text =
-        response.data?.data?.text ??
-        response.data?.text ??
-        '';
-      if (text) {
-        this.logger.log(
-          `Loaded document text for ${documentId}: ${text.length} chars`,
-        );
-      }
-      return text;
-    } catch (error) {
-      this.logger.error(
-        `Failed to fetch document text for ${documentId}: ${error.message}`,
-      );
+      return response.data?.data?.text ?? response.data?.text ?? '';
+    } catch {
       return '';
     }
   }
@@ -149,121 +193,200 @@ export class TutorService {
           `${summaryServiceUrl}/api/summaries/document/${documentId}`,
         ),
       );
-      const summary =
+      return (
         response.data?.data?.content ||
         response.data?.summary ||
-        response.data?.content;
-      return summary || null;
+        response.data?.content ||
+        null
+      );
     } catch {
       return null;
     }
   }
 
+  private selectChunks(
+    chunks: TextChunk[],
+    query: string,
+    fullText: string,
+  ): string {
+    if (chunks?.length) {
+      const terms = query.toLowerCase().split(/\s+/).filter((t) => t.length > 2);
+      const scored = chunks.map((c) => {
+        const lower = c.text.toLowerCase();
+        let score = 0;
+        for (const t of terms) {
+          if (lower.includes(t)) score += 1;
+        }
+        return { text: c.text, score };
+      });
+      const best = scored
+        .sort((a, b) => b.score - a.score)
+        .filter((s) => s.score > 0)
+        .slice(0, 4);
+      if (best.length) {
+        return best.map((b) => b.text).join('\n\n---\n\n');
+      }
+      return chunks
+        .slice(0, 3)
+        .map((c) => c.text)
+        .join('\n\n---\n\n');
+    }
+    return this.truncateText(fullText, 12000);
+  }
+
   private truncateText(text: string, maxChars: number): string {
     if (text.length <= maxChars) return text;
-    return `${text.slice(0, maxChars)}\n\n[... nội dung bị cắt bớt do giới hạn độ dài ...]`;
+    return `${text.slice(0, maxChars)}\n\n[... nội dung bị cắt bớt ...]`;
   }
 
   private async generateAnswer(
     question: string,
     documentText: string,
     summary: string | null,
-    previousMessages: any[],
-  ): Promise<string> {
-    if (!this.genAI) {
-      throw new InternalServerErrorException('GEMINI_API_KEY is missing. Please add it to your .env file to enable AI tutoring.');
+    chunkContext: string,
+    previousMessages: { role: string; content: string }[],
+    aiSource: string | null,
+  ): Promise<{
+    answer: string;
+    usedFallback: boolean;
+    fallbackHint?: string;
+  }> {
+    if (!this.genAI || !this.configService.get<string>('GEMINI_API_KEY')) {
+      return {
+        answer: this.buildFallbackAnswer(
+          question,
+          chunkContext,
+          summary,
+          'GEMINI_API_KEY chưa cấu hình trong tutor-service/.env',
+        ),
+        usedFallback: true,
+        fallbackHint: 'missing_key',
+      };
     }
 
     try {
-      const modelName = this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
+      const modelName =
+        this.configService.get<string>('GEMINI_MODEL') || 'gemini-2.5-flash';
       const model = this.genAI.getGenerativeModel({ model: modelName });
 
-      // Build chat history context
       let historyContext = '';
-      if (previousMessages && previousMessages.length > 0) {
-        historyContext = 'Previous conversation history:\n' + 
-          previousMessages.map(m => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`).join('\n') + '\n\n';
+      if (previousMessages?.length) {
+        historyContext =
+          'Previous conversation:\n' +
+          previousMessages
+            .map((m) => `${m.role === 'user' ? 'User' : 'AI'}: ${m.content}`)
+            .join('\n') +
+          '\n\n';
       }
 
-      const docExcerpt = this.truncateText(documentText, 60000);
       const summaryBlock = summary
-        ? `\n=== TÓM TẮT (tham khảo) ===\n"""\n${summary}\n"""\n`
+        ? `\n=== TÓM TẮT (cache) ===\n"""\n${summary}\n"""\n`
         : '';
 
-      const prompt = `Bạn là Gia sư Tiếng Anh AI. Trả lời DỰA TRÊN NỘI DUNG TÀI LIỆU GỐC bên dưới (có đủ câu hỏi bài tập nếu là file quiz).
+      const prompt = `Bạn là Gia sư Tiếng Anh AI. Trả lời DỰA TRÊN NGỮ CẢNH TÀI LIỆU.
 
-=== NỘI DUNG TÀI LIỆU GỐC ===
+=== ĐOẠN LIÊN QUAN ===
 """
-${docExcerpt}
+${this.truncateText(chunkContext, 20000)}
 """
 ${summaryBlock}
 ${historyContext}
 
-=== NĂNG LỰC ===
-- Giải đáp câu hỏi trắc nghiệm / bài tập trong tài liệu (ghi rõ đáp án A/B/C/D và giải thích)
-- Giải thích ngữ pháp, sửa câu, dịch từ vựng
+Câu hỏi: ${question}
 
-=== ĐỊNH DẠNG BẮT BUỘC (Markdown, dễ đọc) ===
-- Mỗi câu hỏi một block riêng: ### Câu 1, **Đáp án: B**, giải thích 2-3 câu
-- Dùng danh sách gạch đầu dòng, KHÔNG viết một đoạn văn dài liên tục
-- Tối đa 5-8 dòng giải thích mỗi câu (trừ khi user yêu cầu chi tiết hơn)
-
-=== QUY TẮC ===
-1. Ưu tiên trích dẫn đúng nội dung từ tài liệu gốc.
-2. Chỉ nói "không có trong tài liệu" khi thật sự không thấy trong phần NỘI DUNG TÀI LIỆU GỐC.
-3. Trả lời tiếng Việt; giữ nguyên câu/đáp án tiếng Anh.
-
-=== CÂU HỎI HỌC VIÊN ===
-${question}`;
+Trả lời Markdown ngắn gọn, tiếng Việt, giữ câu tiếng Anh từ tài liệu.`;
 
       const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
-    } catch (error) {
-      this.logger.error(`AI generation failed: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to generate answer from AI');
+      const text = result.response.text();
+      this.logger.log(
+        `[tutor] provider=gemini model=${modelName} aiSource=${aiSource ?? 'live'}`,
+      );
+      return { answer: text, usedFallback: false };
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      const kind = classifyGeminiError(message);
+      const hint = userFacingGeminiHint(kind);
+      this.logger.warn(`[tutor] ${kind} — fallback activated: ${hint}`);
+
+      return {
+        answer: this.buildFallbackAnswer(question, chunkContext, summary, hint),
+        usedFallback: true,
+        fallbackHint: kind,
+      };
     }
   }
 
+  private buildFallbackAnswer(
+    question: string,
+    context: string,
+    summary: string | null,
+    reason?: string,
+  ): string {
+    const q = question.toLowerCase();
+    const excerpt = context.slice(0, 1500);
+    const lines: string[] = [
+      `**${reason || 'AI hiện không khả dụng. Hệ thống đang sử dụng chế độ xử lý cục bộ.'}**`,
+      '',
+    ];
 
+    if (summary) {
+      lines.push('### Tóm tắt có sẵn');
+      lines.push(summary.slice(0, 800));
+      lines.push('');
+    }
 
-  async getHistory(userId: string, documentId?: string, skip: number = 0, take: number = 10) {
+    if (excerpt) {
+      lines.push('### Đoạn liên quan trong tài liệu');
+      lines.push(`> ${excerpt.replace(/\n/g, '\n> ')}`);
+      lines.push('');
+    }
+
+    lines.push(
+      '### Gợi ý',
+      '- Tìm từ khóa trong đoạn trên để tự suy luận đáp án.',
+      '- Thử lại sau khi quota Gemini được reset.',
+    );
+
+    if (q.includes('nghĩa') || q.includes('meaning')) {
+      lines.push('- Với câu hỏi từ vựng: đối chiếu dòng dạng `word - nghĩa` trong file.');
+    }
+
+    return lines.join('\n');
+  }
+
+  async getHistory(
+    userId: string,
+    documentId?: string,
+    skip: number = 0,
+    take: number = 10,
+  ) {
     try {
-      // Find conversations for the user (optionally filtered by documentId)
       const conversations = await this.prisma.conversation.findMany({
         where: documentId ? { documentId } : {},
         include: {
-          messages: {
-            orderBy: { createdAt: 'asc' },
-          },
+          messages: { orderBy: { createdAt: 'asc' } },
         },
         orderBy: { createdAt: 'desc' },
         skip,
         take,
       });
 
-      // Transform to tutor chat response format
-      const history = conversations.map((conv) => ({
-        conversationId: conv.id,
-        documentId: conv.documentId,
-        messages: conv.messages,
-      }));
-
       const total = await this.prisma.conversation.count({
         where: documentId ? { documentId } : {},
       });
 
       return {
-        data: history,
-        pagination: {
-          skip,
-          take,
-          total,
-        },
+        data: conversations.map((conv) => ({
+          conversationId: conv.id,
+          documentId: conv.documentId,
+          messages: conv.messages,
+        })),
+        pagination: { skip, take, total },
       };
-    } catch (error) {
-      this.logger.error(`Error fetching tutor history: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to fetch tutor history');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`[tutor] history failed: ${message}`);
+      throw new BadRequestException('Failed to fetch tutor history');
     }
   }
 }

@@ -6,6 +6,15 @@ export declare class TutorController {
     askQuestion(askDto: AskDto): Promise<{
         conversationId: any;
         answer: string;
+        fallback: boolean;
+        fallbackHint: string;
+        model: string;
+    } | {
+        conversationId: string;
+        answer: string;
+        fallback: boolean;
+        fallbackHint?: undefined;
+        model?: undefined;
     }>;
     getHistory(userId: string, documentId?: string, skip?: string, take?: string): Promise<{
         data: {

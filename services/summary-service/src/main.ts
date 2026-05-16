@@ -1,12 +1,23 @@
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
-import { Logger } from '@nestjs/common';
+import { ConsoleLogger, Logger } from '@nestjs/common';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+class PrefixLogger extends ConsoleLogger {
+  log(message: any, context?: string) { super.log(`[SUMMARY] ${message}`, context); }
+  error(message: any, stackOrContext?: string) { super.error(`[SUMMARY] ${message}`, stackOrContext); }
+  warn(message: any, context?: string) { super.warn(`[SUMMARY] ${message}`, context); }
+  debug(message: any, context?: string) { super.debug(`[SUMMARY] ${message}`, context); }
+  verbose(message: any, context?: string) { super.verbose(`[SUMMARY] ${message}`, context); }
+}
+
 async function bootstrap() {
+  process.title = 'SUMMARY SERVICE';
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: new PrefixLogger(),
+  });
   app.useGlobalInterceptors(new TransformInterceptor());
 
   // Enable CORS
@@ -37,6 +48,14 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3006;
   await app.listen(port);
-  logger.log(`Summary Service is running on http://localhost:${port}`);
+  
+  console.log(`
+==================================================
+🚀 SUMMARY SERVICE RUNNING
+PORT: ${port}
+GEMINI: ENABLED
+DATABASE: Prisma (PostgreSQL)
+==================================================
+  `);
 }
 bootstrap();

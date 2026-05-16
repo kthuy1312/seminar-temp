@@ -24,14 +24,17 @@ let QuizController = class QuizController {
     listQuizzes(userId, skip, take) {
         return this.quizService.listQuizzes(userId, parseInt(skip || '0'), parseInt(take || '10'));
     }
-    generateQuiz(dto) {
-        return this.quizService.generateQuiz(dto.documentId);
+    generateQuiz(userId, dto) {
+        return this.quizService.generateQuiz(dto.documentId, userId);
     }
     getQuiz(id) {
         return this.quizService.getQuiz(id);
     }
     submitQuiz(dto) {
         return this.quizService.submitQuiz(dto.quizId, dto.userId, dto.answers);
+    }
+    deleteQuiz(id) {
+        return this.quizService.deleteQuiz(id);
     }
     listFlashcards(userId, documentId) {
         return this.quizService.listFlashcards(userId, documentId);
@@ -55,9 +58,10 @@ __decorate([
 ], QuizController.prototype, "listQuizzes", null);
 __decorate([
     (0, common_1.Post)('generate'),
-    __param(0, (0, common_1.Body)()),
+    __param(0, (0, common_1.Headers)('x-user-id')),
+    __param(1, (0, common_1.Body)()),
     __metadata("design:type", Function),
-    __metadata("design:paramtypes", [generate_quiz_dto_1.GenerateQuizDto]),
+    __metadata("design:paramtypes", [String, generate_quiz_dto_1.GenerateQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "generateQuiz", null);
 __decorate([
@@ -74,6 +78,13 @@ __decorate([
     __metadata("design:paramtypes", [submit_quiz_dto_1.SubmitQuizDto]),
     __metadata("design:returntype", void 0)
 ], QuizController.prototype, "submitQuiz", null);
+__decorate([
+    (0, common_1.Delete)(':id'),
+    __param(0, (0, common_1.Param)('id')),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", void 0)
+], QuizController.prototype, "deleteQuiz", null);
 __decorate([
     (0, common_1.Get)('flashcards/all'),
     __param(0, (0, common_1.Headers)('x-user-id')),

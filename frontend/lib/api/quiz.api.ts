@@ -47,6 +47,12 @@ export async function submitQuiz(payload: {
   });
 }
 
+export async function deleteQuiz(id: string) {
+  return apiRequest<any>(`/api/quiz/${id}`, {
+    method: "DELETE",
+  });
+}
+
 // --- Flashcards ---
 
 export async function getFlashcards(documentId?: string) {

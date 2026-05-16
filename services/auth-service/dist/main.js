@@ -5,8 +5,18 @@ const common_1 = require("@nestjs/common");
 const app_module_1 = require("./app.module");
 const http_exception_filter_1 = require("./common/filters/http-exception.filter");
 const transform_interceptor_1 = require("./common/interceptors/transform.interceptor");
+class PrefixLogger extends common_1.ConsoleLogger {
+    log(message, context) { super.log(`[AUTH] ${message}`, context); }
+    error(message, stackOrContext) { super.error(`[AUTH] ${message}`, stackOrContext); }
+    warn(message, context) { super.warn(`[AUTH] ${message}`, context); }
+    debug(message, context) { super.debug(`[AUTH] ${message}`, context); }
+    verbose(message, context) { super.verbose(`[AUTH] ${message}`, context); }
+}
 async function bootstrap() {
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    process.title = 'AUTH SERVICE';
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, {
+        logger: new PrefixLogger(),
+    });
     app.setGlobalPrefix('api/auth');
     app.useGlobalPipes(new common_1.ValidationPipe({
         whitelist: true,
@@ -21,7 +31,15 @@ async function bootstrap() {
     });
     const port = process.env.PORT || 3001;
     await app.listen(port);
-    console.log(`🔐 Auth Service is running on http://localhost:${port}`);
+    console.log(`
+==================================================
+🚀 AUTH SERVICE RUNNING
+PORT: ${port}
+DATABASE: PostgreSQL
+JWT: ENABLED
+ENV: ${process.env.NODE_ENV || 'DEVELOPMENT'}
+==================================================
+  `);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

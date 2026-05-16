@@ -1,12 +1,23 @@
-import { Logger, ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { MicroserviceOptions, Transport } from '@nestjs/microservices';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 
+class PrefixLogger extends ConsoleLogger {
+  log(message: any, context?: string) { super.log(`[DASHBOARD] ${message}`, context); }
+  error(message: any, stackOrContext?: string) { super.error(`[DASHBOARD] ${message}`, stackOrContext); }
+  warn(message: any, context?: string) { super.warn(`[DASHBOARD] ${message}`, context); }
+  debug(message: any, context?: string) { super.debug(`[DASHBOARD] ${message}`, context); }
+  verbose(message: any, context?: string) { super.verbose(`[DASHBOARD] ${message}`, context); }
+}
+
 async function bootstrap() {
+  process.title = 'DASHBOARD SERVICE';
   const logger = new Logger('Bootstrap');
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: new PrefixLogger(),
+  });
 
   app.setGlobalPrefix('api');
   app.useGlobalPipes(
@@ -46,8 +57,15 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT || 3002);
   await app.listen(port);
-  logger.log(`Dashboard Service is running on http://localhost:${port}`);
-  logger.log(`Swagger docs available at http://localhost:${port}/api/docs`);
+  
+  console.log(`
+==================================================
+🚀 DASHBOARD SERVICE RUNNING
+PORT: ${port}
+TYPE: Internal API
+SWAGGER: http://localhost:${port}/api/docs
+==================================================
+  `);
 }
 
 bootstrap();

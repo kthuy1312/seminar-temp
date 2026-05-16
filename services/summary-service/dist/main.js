@@ -5,9 +5,19 @@ const app_module_1 = require("./app.module");
 const microservices_1 = require("@nestjs/microservices");
 const common_1 = require("@nestjs/common");
 const transform_interceptor_1 = require("./common/interceptors/transform.interceptor");
+class PrefixLogger extends common_1.ConsoleLogger {
+    log(message, context) { super.log(`[SUMMARY] ${message}`, context); }
+    error(message, stackOrContext) { super.error(`[SUMMARY] ${message}`, stackOrContext); }
+    warn(message, context) { super.warn(`[SUMMARY] ${message}`, context); }
+    debug(message, context) { super.debug(`[SUMMARY] ${message}`, context); }
+    verbose(message, context) { super.verbose(`[SUMMARY] ${message}`, context); }
+}
 async function bootstrap() {
+    process.title = 'SUMMARY SERVICE';
     const logger = new common_1.Logger('Bootstrap');
-    const app = await core_1.NestFactory.create(app_module_1.AppModule);
+    const app = await core_1.NestFactory.create(app_module_1.AppModule, {
+        logger: new PrefixLogger(),
+    });
     app.useGlobalInterceptors(new transform_interceptor_1.TransformInterceptor());
     app.enableCors({
         origin: '*',
@@ -33,7 +43,14 @@ async function bootstrap() {
     }
     const port = process.env.PORT || 3006;
     await app.listen(port);
-    logger.log(`Summary Service is running on http://localhost:${port}`);
+    console.log(`
+==================================================
+🚀 SUMMARY SERVICE RUNNING
+PORT: ${port}
+GEMINI: ENABLED
+DATABASE: Prisma (PostgreSQL)
+==================================================
+  `);
 }
 bootstrap();
 //# sourceMappingURL=main.js.map

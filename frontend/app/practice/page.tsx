@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState, Suspense } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { getDocumentById } from "@/lib/api/document.api";
-import { listQuiz, generateQuiz, parseQuizError } from "@/lib/api/quiz.api";
+import { useSearchParams, useRouter } from "next/navigation";
+import { getDocumentById, getDocuments } from "@/lib/api/document.api";
+import { listQuiz, generateQuiz, parseQuizError, deleteQuiz } from "@/lib/api/quiz.api";
+import { usePractice } from "@/hooks/use-practice";
 import { DocumentItem } from "@/types/document";
 import { QuizItem } from "@/types/quiz";
 import {
@@ -15,11 +16,13 @@ import {
   DocumentTextIcon,
   ArrowLeftIcon,
   AcademicCapIcon,
+  TrashIcon,
 } from "@heroicons/react/24/outline";
 
 type TabId = "quiz" | "flashcard";
 
 function PracticeContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const documentId = searchParams.get("documentId");
   const initialTab = searchParams.get("tab") === "flashcard" ? "flashcard" : "quiz";
@@ -29,52 +32,24 @@ function PracticeContent() {
   useEffect(() => {
     setActiveTab(searchParams.get("tab") === "flashcard" ? "flashcard" : "quiz");
   }, [searchParams]);
-  const [document, setDocument] = useState<DocumentItem | null>(null);
-  const [quizzes, setQuizzes] = useState<QuizItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [quizList, doc] = await Promise.all([
-        listQuiz(),
-        documentId ? getDocumentById(documentId).catch(() => null) : Promise.resolve(null),
-      ]);
-      setQuizzes(quizList);
-      setDocument(doc);
-    } catch (err) {
-      setError(parseQuizError(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [documentId]);
+  const {
+    document,
+    documents,
+    quizzes: filteredQuizzes,
+    loading,
+    isGenerating,
+    error,
+    handleGenerateQuiz,
+    handleDeleteQuiz,
+  } = usePractice(documentId);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const filteredQuizzes = useMemo(() => {
-    if (!documentId) return quizzes;
-    return quizzes.filter((q) => q.documentId === documentId);
-  }, [quizzes, documentId]);
-
-  const handleGenerateQuiz = async () => {
-    if (!documentId) {
-      setError("Hãy chọn tài liệu từ Thư viện trước khi tạo Quiz.");
-      return;
-    }
-    setIsGenerating(true);
-    setError(null);
-    try {
-      const newQuiz = await generateQuiz(documentId);
-      setQuizzes((prev) => [newQuiz, ...prev.filter((q) => q.id !== newQuiz.id)]);
-    } catch (err) {
-      setError(parseQuizError(err));
-    } finally {
-      setIsGenerating(false);
+  const handleDocumentSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value;
+    if (val) {
+      router.push(`/practice?documentId=${val}&tab=${activeTab}`);
+    } else {
+      router.push(`/practice?tab=${activeTab}`);
     }
   };
 
@@ -92,38 +67,46 @@ function PracticeContent() {
       )}
 
       {/* Hero */}
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-orange-500 to-amber-600 p-6 text-white shadow-lg md:p-8">
-        <p className="text-xs font-bold uppercase tracking-widest text-orange-100">Luyện tiếng Anh</p>
-        <h1 className="mt-2 text-2xl font-extrabold md:text-3xl">Quiz & Flashcard</h1>
-        <p className="mt-2 max-w-xl text-sm text-orange-50">
+      <section className="relative overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-orange-500 to-amber-600 p-6 text-white shadow-lg md:p-8">
+        <p className="relative z-10 text-xs font-bold uppercase tracking-widest text-orange-100">Luyện tiếng Anh</p>
+        <h1 className="relative z-10 mt-2 text-2xl font-extrabold md:text-3xl">Quiz & Flashcard</h1>
+        <p className="relative z-10 mt-2 max-w-xl text-sm text-orange-50">
           Trắc nghiệm IELTS/TOEIC và thẻ từ vựng — tạo từ tài liệu đã phân tích AI.
         </p>
 
         {document && (
-          <div className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 py-2 text-sm backdrop-blur-sm">
+          <div className="relative z-10 mt-4 inline-flex items-center gap-2 rounded-lg bg-white/15 px-3 py-2 text-sm backdrop-blur-sm">
             <DocumentTextIcon className="h-4 w-4 shrink-0" />
             <span className="truncate font-medium">{document.fileName}</span>
           </div>
         )}
 
-        {!documentId && (
-          <Link
-            href="/documents"
-            className="mt-4 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-bold text-orange-700 hover:bg-orange-50"
-          >
-            Chọn tài liệu để bắt đầu
-          </Link>
+        {!documentId && documents.length > 0 && (
+          <div className="relative z-10 mt-4 max-w-md">
+            <select
+              value=""
+              onChange={handleDocumentSelect}
+              className="w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-slate-900 font-medium shadow-sm focus:ring-2 focus:ring-orange-300 outline-none cursor-pointer"
+            >
+              <option value="" disabled>-- Chọn tài liệu để luyện tập --</option>
+              {documents.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.fileName}
+                </option>
+              ))}
+            </select>
+          </div>
         )}
       </section>
 
       {/* Tabs */}
       <div className="flex gap-2 rounded-xl border border-slate-200 bg-slate-100 p-1">
-        <TabButton active={activeTab === "quiz"} onClick={() => setActiveTab("quiz")} icon={PuzzlePieceIcon}>
+        <TabButton active={activeTab === "quiz"} onClick={() => { setActiveTab("quiz"); router.replace(`/practice?${documentId ? `documentId=${documentId}&` : ''}tab=quiz`, {scroll:false}); }} icon={PuzzlePieceIcon}>
           Quiz ({filteredQuizzes.length})
         </TabButton>
         <TabButton
           active={activeTab === "flashcard"}
-          onClick={() => setActiveTab("flashcard")}
+          onClick={() => { setActiveTab("flashcard"); router.replace(`/practice?${documentId ? `documentId=${documentId}&` : ''}tab=flashcard`, {scroll:false}); }}
           icon={RectangleStackIcon}
         >
           Flashcard
@@ -145,6 +128,7 @@ function PracticeContent() {
           quizzes={filteredQuizzes}
           isGenerating={isGenerating}
           onGenerate={handleGenerateQuiz}
+          onDelete={handleDeleteQuiz}
         />
       ) : (
         <FlashcardPanel documentId={documentId} />
@@ -198,11 +182,13 @@ function QuizPanel({
   quizzes,
   isGenerating,
   onGenerate,
+  onDelete,
 }: {
   documentId: string | null;
   quizzes: QuizItem[];
   isGenerating: boolean;
   onGenerate: () => void;
+  onDelete: (id: string) => void;
 }) {
   return (
     <div className="space-y-4">
@@ -212,7 +198,7 @@ function QuizPanel({
           <div>
             <h2 className="font-bold text-slate-900">Tạo Quiz từ tài liệu</h2>
             <p className="mt-1 text-sm text-slate-600">
-              AI tạo 5 câu trắc nghiệm (từ vựng, ngữ pháp, đọc hiểu) — cần đã phân tích tài liệu.
+              AI tạo 10 câu trắc nghiệm (từ vựng, ngữ pháp, đọc hiểu) — cần đã phân tích tài liệu.
             </p>
           </div>
           <button
@@ -242,7 +228,7 @@ function QuizPanel({
           <PuzzlePieceIcon className="mx-auto h-12 w-12 text-slate-300" />
           <p className="mt-4 font-semibold text-slate-700">Chưa có Quiz</p>
           <p className="mt-1 text-sm text-slate-500">
-            {documentId ? "Nhấn \"Tạo Quiz mới\" ở trên." : "Chọn tài liệu từ Thư viện."}
+            {documentId ? "Nhấn \"Tạo Quiz mới\" ở trên." : "Chọn tài liệu bằng dropdown ở trên cùng."}
           </p>
         </div>
       ) : (
@@ -263,13 +249,24 @@ function QuizPanel({
                     ` · ${new Date(quiz.createdAt).toLocaleDateString("vi-VN")}`}
                 </p>
               </div>
-              <Link
-                href={`/practice/${quiz.id}`}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
-              >
-                <PlayIcon className="h-3.5 w-3.5" />
-                Làm bài
-              </Link>
+              
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href={`/practice/${quiz.id}`}
+                  className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800"
+                >
+                  <PlayIcon className="h-3.5 w-3.5" />
+                  Làm bài
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => onDelete(quiz.id)}
+                  className="inline-flex shrink-0 items-center justify-center rounded-lg bg-red-50 p-2 text-red-600 hover:bg-red-100 transition"
+                  title="Xóa Quiz"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -291,12 +288,9 @@ function FlashcardPanel({ documentId }: { documentId: string | null }) {
         Từ/cụm tiếng Anh — nghĩa tiếng Việt — ví dụ câu. Tạo từ tài liệu đã phân tích.
       </p>
       {!documentId ? (
-        <Link
-          href="/documents"
-          className="mt-6 inline-block font-bold text-emerald-700 hover:underline"
-        >
-          Chọn tài liệu trước →
-        </Link>
+        <p className="mt-6 text-sm font-semibold text-emerald-700">
+          Hãy chọn tài liệu ở thanh chọn trên cùng để học Flashcard.
+        </p>
       ) : (
         <Link
           href={flashcardHref}

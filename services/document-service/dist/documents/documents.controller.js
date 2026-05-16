@@ -32,6 +32,7 @@ const ALLOWED_MIMES = new Set([
     'application/pdf',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     'application/msword',
+    'text/plain',
 ]);
 const fileFilter = (_req, file, cb) => {
     const ext = (0, path_1.extname)(file.originalname).toLowerCase();
@@ -58,6 +59,15 @@ let DocumentsController = class DocumentsController {
             ...query,
             userId: query.userId || headerUserId,
         });
+    }
+    async getStatus(id) {
+        return this.documentsService.getProcessingStatus(id);
+    }
+    async getAiAnalysis(id) {
+        return this.documentsService.getAiAnalysis(id);
+    }
+    async reprocess(id, body) {
+        return this.documentsService.reprocess(id, body?.forceAi === true);
     }
     async findOne(id) {
         return this.documentsService.findOne(id);
@@ -98,6 +108,29 @@ __decorate([
     __metadata("design:paramtypes", [documents_dto_1.QueryDocumentsDto, String]),
     __metadata("design:returntype", Promise)
 ], DocumentsController.prototype, "findAll", null);
+__decorate([
+    (0, common_1.Get)(':id/status'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], DocumentsController.prototype, "getStatus", null);
+__decorate([
+    (0, common_1.Get)(':id/ai-analysis'),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String]),
+    __metadata("design:returntype", Promise)
+], DocumentsController.prototype, "getAiAnalysis", null);
+__decorate([
+    (0, common_1.Post)(':id/reprocess'),
+    (0, common_1.HttpCode)(common_1.HttpStatus.OK),
+    __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),
+    __param(1, (0, common_1.Body)()),
+    __metadata("design:type", Function),
+    __metadata("design:paramtypes", [String, Object]),
+    __metadata("design:returntype", Promise)
+], DocumentsController.prototype, "reprocess", null);
 __decorate([
     (0, common_1.Get)(':id'),
     __param(0, (0, common_1.Param)('id', common_1.ParseUUIDPipe)),

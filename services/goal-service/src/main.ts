@@ -1,12 +1,23 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ConsoleLogger, ValidationPipe, Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 
+class PrefixLogger extends ConsoleLogger {
+  log(message: any, context?: string) { super.log(`[GOAL] ${message}`, context); }
+  error(message: any, stackOrContext?: string) { super.error(`[GOAL] ${message}`, stackOrContext); }
+  warn(message: any, context?: string) { super.warn(`[GOAL] ${message}`, context); }
+  debug(message: any, context?: string) { super.debug(`[GOAL] ${message}`, context); }
+  verbose(message: any, context?: string) { super.verbose(`[GOAL] ${message}`, context); }
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  process.title = 'GOAL SERVICE';
+  const app = await NestFactory.create(AppModule, {
+    logger: new PrefixLogger(),
+  });
   const logger = new Logger('Bootstrap');
 
   // Enable CORS
@@ -63,8 +74,14 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3004;
   await app.listen(port);
 
-  logger.log(`🚀 Goal Service listening on port ${port}`);
-  logger.log(`📚 Swagger documentation available at http://localhost:${port}/docs`);
+  console.log(`
+==================================================
+🚀 GOAL SERVICE RUNNING
+PORT: ${port}
+GEMINI: ENABLED
+SWAGGER: http://localhost:${port}/docs
+==================================================
+  `);
 }
 
 bootstrap().catch((error) => {

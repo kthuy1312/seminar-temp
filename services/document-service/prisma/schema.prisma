@@ -1,6 +1,5 @@
 // ============================================================
 // Prisma Schema — Document Service
-// File: services/document-service/prisma/schema.prisma
 // ============================================================
 
 generator client {
@@ -12,28 +11,50 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ─── ENUM ────────────────────────────────────────────────────
-
 enum FileType {
   pdf
   docx
+  txt
 }
 
-// ─── DOCUMENT ────────────────────────────────────────────────
+enum DocumentStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum DocumentType {
+  vocabulary
+  reading
+  multiple_choice
+  mixed
+  other
+}
 
 model Document {
-  id            String   @id @default(uuid()) @db.Uuid
-  userId        String?  @map("user_id") @db.Uuid
-  fileName      String   @map("file_name") @db.VarChar(255)
-  fileType      FileType @map("file_type")
-  filePath      String   @map("file_path") @db.Text
-  fileSize      BigInt   @map("file_size") // bytes
-  extractedText String?  @map("extracted_text") @db.Text
-  uploadedAt    DateTime @default(now()) @map("uploaded_at")
+  id               String         @id @default(uuid()) @db.Uuid
+  userId           String?        @map("user_id") @db.Uuid
+  fileName         String         @map("file_name") @db.VarChar(255)
+  fileType         FileType       @map("file_type")
+  filePath         String         @map("file_path") @db.Text
+  fileSize         BigInt         @map("file_size")
+  rawText          String?        @map("raw_text") @db.Text
+  extractedText    String?        @map("extracted_text") @db.Text
+  processedContent String?        @map("processed_content") @db.Text
+  documentType     DocumentType?  @map("document_type")
+  chunks           Json?          @db.JsonB
+  aiAnalysis       Json?          @map("ai_analysis") @db.JsonB
+  status           DocumentStatus @default(UPLOADING)
+  processingError  String?        @map("processing_error") @db.Text
+  aiSource         String?        @map("ai_source") @db.VarChar(32)
+  processingMs     Int?           @map("processing_ms")
+  uploadedAt       DateTime       @default(now()) @map("uploaded_at")
+  processedAt      DateTime?      @map("processed_at")
 
-  // Indexes
   @@index([userId])
   @@index([fileType])
+  @@index([status])
   @@index([uploadedAt])
   @@map("documents")
 }

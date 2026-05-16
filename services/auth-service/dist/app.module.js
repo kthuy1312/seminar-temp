@@ -36,7 +36,7 @@ exports.AppModule = AppModule = __decorate([
                     database: configService.get('database.name'),
                     entities: [user_entity_1.User, refresh_token_entity_1.RefreshToken],
                     synchronize: configService.get('nodeEnv') === 'development',
-                    logging: configService.get('nodeEnv') === 'development',
+                    logging: configService.get('nodeEnv') === 'development' ? ['error', 'warn'] : false,
                 }),
             }),
             auth_module_1.AuthModule,

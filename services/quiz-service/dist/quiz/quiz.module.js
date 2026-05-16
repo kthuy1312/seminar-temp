@@ -12,6 +12,7 @@ const axios_1 = require("@nestjs/axios");
 const quiz_controller_1 = require("./quiz.controller");
 const quiz_service_1 = require("./quiz.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const document_analysis_client_1 = require("./document-analysis.client");
 let QuizModule = class QuizModule {
 };
 exports.QuizModule = QuizModule;
@@ -19,7 +20,7 @@ exports.QuizModule = QuizModule = __decorate([
     (0, common_1.Module)({
         imports: [axios_1.HttpModule],
         controllers: [quiz_controller_1.QuizController],
-        providers: [quiz_service_1.QuizService, prisma_service_1.PrismaService],
+        providers: [quiz_service_1.QuizService, prisma_service_1.PrismaService, document_analysis_client_1.DocumentAnalysisClient],
         exports: [quiz_service_1.QuizService],
     })
 ], QuizModule);

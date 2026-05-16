@@ -2,12 +2,9 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  InternalServerErrorException,
-  ServiceUnavailableException,
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AiService } from '../ai/ai.service';
 import { ConfigService } from '@nestjs/config';
 import axios from 'axios';
 
@@ -17,142 +14,133 @@ export class SummaryService {
 
   constructor(
     private readonly prisma: PrismaService,
-    private readonly aiService: AiService,
     private readonly configService: ConfigService,
   ) {}
 
-  async handleDocumentUploaded(payload: any) {
-    const { document_id, extracted_text } = payload;
-    
-    this.logger.log(`Received document.uploaded event for document: ${document_id}`);
-    
-    let textToSummarize = extracted_text;
-
-    // 1 & 2 & 3: Nếu payload không có text (hoặc vì lý do nào đó), ta sẽ gọi Document Service để lấy
-    if (!textToSummarize) {
-      this.logger.log(`No extracted text in payload, calling Document Service to extract for ${document_id}`);
-      try {
-        const documentServiceUrl =
-          process.env.DOCUMENT_SERVICE_URL || 'http://localhost:3003';
-        const response = await axios.post(
-          `${documentServiceUrl}/api/documents/${document_id}/extract`,
-        );
-        if (response.data?.data?.text) {
-          textToSummarize = response.data.data.text;
-        } else {
-          throw new Error('No text returned from Document Service');
-        }
-      } catch (error) {
-        this.logger.error(`Failed to fetch text from Document Service for ${document_id}`, error);
-        return; // Dừng xử lý nếu không lấy được text
-      }
-    }
-
-    if (!textToSummarize || textToSummarize.trim() === '') {
-      this.logger.warn(`Document ${document_id} has empty text. Cannot summarize.`);
-      return;
-    }
-
-    // 4. Gọi AI (Gemini) để tóm tắt
-    this.logger.log(`Calling Gemini AI to summarize document ${document_id}...`);
-    let summaryContent = '';
-    try {
-      summaryContent = await this.aiService.summarizeText(textToSummarize);
-    } catch (error) {
-      this.logger.error(`Gemini AI failed for document ${document_id}`, error);
-      return;
-    }
-
-    // 5. Lưu summary vào database
-    try {
-      const summary = await this.prisma.summary.create({
-        data: {
-          documentId: document_id,
-          content: summaryContent,
-        },
-      });
-      this.logger.log(`Successfully saved summary (id: ${summary.id}) for document ${document_id}`);
-    } catch (error) {
-      this.logger.error(`Failed to save summary to DB for document ${document_id}`, error);
-    }
-  }
-
-  private extractTextFromResponse(response: { data?: unknown }): string {
-    const data = response.data as Record<string, unknown> | undefined;
-    const inner = data?.data as Record<string, unknown> | undefined;
-    return (
-      (inner?.text as string) ||
-      (data?.text as string) ||
-      ''
+  async handleDocumentUploaded(payload: { document_id: string }) {
+    const { document_id } = payload;
+    this.logger.log(
+      `[summary] document.uploaded ${document_id} — processing handled by document-service`,
     );
+    await this.syncSummaryFromDocument(document_id);
   }
 
   async generateSummary(documentId: string, force = false) {
-    this.logger.log(`Generating summary for document ${documentId} (force=${force})...`);
+    this.logger.log(`[summary] sync from document ${documentId} (force=${force})`);
 
-    try {
-      if (!force) {
-        const existingSummary = await this.prisma.summary.findFirst({
-          where: { documentId },
-          orderBy: { createdAt: 'desc' },
-        });
-        if (existingSummary) {
-          return existingSummary;
-        }
-      } else {
-        await this.prisma.summary.deleteMany({ where: { documentId } });
-      }
-
-      const documentServiceUrl =
-        this.configService.get<string>('DOCUMENT_SERVICE_URL') || 'http://localhost:3003';
-      const extractResponse = await axios.post(
-        `${documentServiceUrl}/api/documents/${documentId}/extract`,
-        {},
-        { timeout: 30000 },
-      );
-
-      const textToSummarize = this.extractTextFromResponse(extractResponse);
-
-      if (!textToSummarize?.trim()) {
-        throw new BadRequestException(
-          'Không đọc được nội dung file. Hãy tải lại file PDF/DOCX hợp lệ.',
-        );
-      }
-
-      const summaryContent = await this.aiService.summarizeText(textToSummarize);
-
-      const summary = await this.prisma.summary.create({
-        data: { documentId, content: summaryContent },
-      });
-
-      this.logger.log(`Successfully generated summary for document ${documentId}`);
-      return summary;
-    } catch (error) {
-      this.logger.error(`Failed to generate summary for document ${documentId}:`, error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      if (error instanceof BadRequestException) throw error;
-      if (message.includes('quota') || message.includes('429')) {
-        throw new ServiceUnavailableException(message);
-      }
-      if (message.includes('GEMINI_API_KEY')) {
-        throw new InternalServerErrorException(message);
-      }
-      throw new InternalServerErrorException(
-        `Phân tích thất bại: ${message}`,
-      );
+    if (force) {
+      await this.triggerDocumentReprocess(documentId, true);
     }
+
+    return this.syncSummaryFromDocument(documentId, force);
   }
 
   async getSummaryByDocumentId(documentId: string) {
-    const summary = await this.prisma.summary.findFirst({
+    const existing = await this.prisma.summary.findFirst({
       where: { documentId },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!summary) {
-      throw new NotFoundException(`Summary cho document ${documentId} không tồn tại`);
+    if (existing?.content) {
+      return existing;
     }
 
+    return this.syncSummaryFromDocument(documentId);
+  }
+
+  private async syncSummaryFromDocument(documentId: string, force = false) {
+    const documentServiceUrl =
+      this.configService.get<string>('DOCUMENT_SERVICE_URL') ||
+      'http://localhost:3003';
+
+    let doc: Record<string, unknown> | null = null;
+    try {
+      const res = await axios.get(`${documentServiceUrl}/api/documents/${documentId}`, {
+        timeout: 15000,
+      });
+      doc = res.data?.data ?? res.data;
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[summary] fetch document failed: ${message}`);
+    }
+
+    const status = doc?.status as string | undefined;
+    if (status === 'PROCESSING' || status === 'UPLOADING') {
+      throw new BadRequestException(
+        'Tài liệu đang được xử lý. Vui lòng đợi vài giây rồi tải lại trang.',
+      );
+    }
+
+    let analysis: { summary?: string } | null =
+      (doc?.aiAnalysis as { summary?: string }) ?? null;
+
+    if (!analysis?.summary) {
+      try {
+        const analysisRes = await axios.get(
+          `${documentServiceUrl}/api/documents/${documentId}/ai-analysis`,
+          { timeout: 15000 },
+        );
+        analysis = analysisRes.data?.data ?? analysisRes.data;
+      } catch {
+        analysis = null;
+      }
+    }
+
+    const content = analysis?.summary?.trim();
+    if (!content) {
+      if (status === 'FAILED') {
+        throw new BadRequestException(
+          (doc?.processingError as string) ||
+            'Xử lý tài liệu thất bại. Hệ thống vẫn cho phép xem nội dung và dùng chế độ cục bộ.',
+        );
+      }
+      throw new NotFoundException(
+        `Chưa có phân tích cho document ${documentId}. Đợi trạng thái READY.`,
+      );
+    }
+
+    if (force) {
+      await this.prisma.summary.deleteMany({ where: { documentId } });
+    }
+
+    const existing = await this.prisma.summary.findFirst({
+      where: { documentId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (existing && !force) {
+      if (existing.content !== content) {
+        return this.prisma.summary.update({
+          where: { id: existing.id },
+          data: { content },
+        });
+      }
+      return existing;
+    }
+
+    const summary = await this.prisma.summary.create({
+      data: { documentId, content },
+    });
+
+    this.logger.log(
+      `[summary] synced document ${documentId} source=${doc?.aiSource ?? 'document'}`,
+    );
     return summary;
+  }
+
+  private async triggerDocumentReprocess(documentId: string, forceAi: boolean) {
+    const documentServiceUrl =
+      this.configService.get<string>('DOCUMENT_SERVICE_URL') ||
+      'http://localhost:3003';
+    try {
+      await axios.post(
+        `${documentServiceUrl}/api/documents/${documentId}/reprocess`,
+        { forceAi },
+        { timeout: 120000 },
+      );
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`[summary] reprocess trigger failed: ${message}`);
+    }
   }
 }

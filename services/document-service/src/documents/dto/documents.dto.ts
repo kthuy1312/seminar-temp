@@ -6,7 +6,7 @@ export enum FileTypeEnum {
   TXT = 'txt',
 }
 
-export const ALLOWED_EXTENSIONS = ['.pdf', '.docx'];
+export const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.txt'];
 export const MAX_FILE_SIZE_BYTES = 10 * 1024 * 1024; // 10MB
 
 export class UploadDocumentDto {

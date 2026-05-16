@@ -1,13 +1,24 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe } from '@nestjs/common';
+import { ConsoleLogger, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor';
 
+class PrefixLogger extends ConsoleLogger {
+  log(message: any, context?: string) { super.log(`[DOCUMENT] ${message}`, context); }
+  error(message: any, stackOrContext?: string) { super.error(`[DOCUMENT] ${message}`, stackOrContext); }
+  warn(message: any, context?: string) { super.warn(`[DOCUMENT] ${message}`, context); }
+  debug(message: any, context?: string) { super.debug(`[DOCUMENT] ${message}`, context); }
+  verbose(message: any, context?: string) { super.verbose(`[DOCUMENT] ${message}`, context); }
+}
+
 async function bootstrap() {
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  process.title = 'DOCUMENT SERVICE';
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
+    logger: new PrefixLogger(),
+  });
 
   // ── Static file serving (/api/documents/files/<filename>) ──
   // Cho phép download file đã upload qua URL trả về
@@ -42,8 +53,14 @@ async function bootstrap() {
   const port = process.env.PORT ?? 3003;
   await app.listen(port);
 
-  console.log(`📄 Document Service is running on http://localhost:${port}`);
-  console.log(`📁 Files served at  http://localhost:${port}/api/documents/files/<filename>`);
+  console.log(`
+==================================================
+🚀 DOCUMENT SERVICE RUNNING
+PORT: ${port}
+DATABASE: Prisma (PostgreSQL)
+FILES: http://localhost:${port}/api/documents/files/<filename>
+==================================================
+  `);
 }
 
 bootstrap();

@@ -43,8 +43,8 @@ const storage = diskStorage({
 const ALLOWED_MIMES = new Set([
   'application/pdf',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  // Một số client gửi MIME này cho .docx
   'application/msword',
+  'text/plain',
 ]);
 
 const fileFilter = (
@@ -146,6 +146,25 @@ export class DocumentsController {
   /**
    * GET /api/documents/:id
    */
+  @Get(':id/status')
+  async getStatus(@Param('id', ParseUUIDPipe) id: string) {
+    return this.documentsService.getProcessingStatus(id);
+  }
+
+  @Get(':id/ai-analysis')
+  async getAiAnalysis(@Param('id', ParseUUIDPipe) id: string) {
+    return this.documentsService.getAiAnalysis(id);
+  }
+
+  @Post(':id/reprocess')
+  @HttpCode(HttpStatus.OK)
+  async reprocess(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body?: { forceAi?: boolean },
+  ) {
+    return this.documentsService.reprocess(id, body?.forceAi === true);
+  }
+
   @Get(':id')
   async findOne(@Param('id', ParseUUIDPipe) id: string) {
     return this.documentsService.findOne(id);

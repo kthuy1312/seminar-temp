@@ -10,10 +10,13 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio",
+    "test:gemini": "node scripts/test-gemini-models.cjs",
+    "test:gemini:list": "node scripts/list-gemini-models.cjs",
     "test": "jest",
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.0",
     "@nestjs/common": "^10.4.0",
     "@nestjs/config": "^3.2.0",
     "@nestjs/core": "^10.4.0",

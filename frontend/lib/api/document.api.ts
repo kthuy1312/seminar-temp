@@ -1,5 +1,5 @@
 import { apiRequest } from "@/lib/api/client";
-import { DocumentItem } from "@/types/document";
+import { AiAnalysis, DocumentItem, DocumentProcessingStatus } from "@/types/document";
 
 type DocumentEnvelope = {
   success?: boolean;
@@ -42,9 +42,15 @@ export async function getDocumentById(id: string) {
   return data || null;
 }
 
+export async function getDocumentProcessingStatus(id: string) {
+  return apiRequest<DocumentProcessingStatus>(`/api/documents/${id}/status`);
+}
+
+export async function getDocumentAiAnalysis(id: string) {
+  return apiRequest<AiAnalysis | null>(`/api/documents/${id}/ai-analysis`);
+}
+
 export async function deleteDocument(id: string) {
-  // TODO: document-service does not expose DELETE /api/documents/:id yet.
-  // Keep adapter so UI can call this function safely.
   void id;
   return { success: false, message: "DELETE document endpoint is not available yet." };
 }

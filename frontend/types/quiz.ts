@@ -2,6 +2,7 @@ export type QuizQuestion = {
   id: string;
   questionText: string;
   options: string[];
+  correctAnswer: string;
 };
 
 export type QuizItem = {

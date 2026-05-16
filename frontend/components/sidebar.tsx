@@ -10,7 +10,6 @@ import {
   DocumentTextIcon,
   AcademicCapIcon,
   PencilSquareIcon,
-  ChartBarIcon,
 } from "@heroicons/react/24/outline";
 
 type NavItem = {
@@ -26,7 +25,6 @@ const navItems: NavItem[] = [
   { label: "Tài liệu", href: "/documents", icon: DocumentTextIcon },
   { label: "Gia sư AI", href: "/tutor", icon: AcademicCapIcon },
   { label: "Luyện tập", href: "/practice", icon: PencilSquareIcon },
-  { label: "Tiến độ", href: "/progress", icon: ChartBarIcon },
 ];
 
 export default function Sidebar() {

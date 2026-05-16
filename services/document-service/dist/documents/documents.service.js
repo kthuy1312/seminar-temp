@@ -20,15 +20,18 @@ const prisma_service_1 = require("../prisma/prisma.service");
 const client_1 = require("@prisma/client");
 const path_1 = require("path");
 const text_extractor_service_1 = require("./text-extractor.service");
+const document_pipeline_service_1 = require("../processing/document-pipeline.service");
 let DocumentsService = DocumentsService_1 = class DocumentsService {
-    constructor(prisma, textExtractor, rabbitClient) {
+    constructor(prisma, textExtractor, pipeline, rabbitClient) {
         this.prisma = prisma;
         this.textExtractor = textExtractor;
+        this.pipeline = pipeline;
         this.rabbitClient = rabbitClient;
         this.logger = new common_1.Logger(DocumentsService_1.name);
         this.ALLOWED_TYPES = [
             client_1.FileType.pdf,
             client_1.FileType.docx,
+            client_1.FileType.txt,
         ];
     }
     async upload(file, userId) {
@@ -49,8 +52,8 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
             const extractResult = await this.textExtractor.extract(file.path, file.originalname);
             extractedText = extractResult.text;
         }
-        catch (err) {
-            this.logger.warn(`Failed to auto-extract text for ${file.originalname} (file might be scanned/corrupted). Continuing upload.`);
+        catch {
+            this.logger.warn(`Failed to auto-extract text for ${file.originalname}. Continuing upload.`);
         }
         try {
             const document = await this.prisma.document.create({
@@ -60,16 +63,22 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
                     fileType: ext,
                     filePath: file.path,
                     fileSize: BigInt(file.size),
+                    rawText: extractedText,
                     extractedText,
+                    status: client_1.DocumentStatus.UPLOADING,
                 },
+            });
+            await this.prisma.document.update({
+                where: { id: document.id },
+                data: { status: client_1.DocumentStatus.PROCESSING },
             });
             this.logger.log(`Document uploaded: ${document.fileName} (id=${document.id}, size=${file.size}B)`);
             this.rabbitClient.emit('document.uploaded', {
                 document_id: document.id,
                 extracted_text: extractedText,
             });
-            this.logger.log(`Published event 'document.uploaded' for document: ${document.id}`);
-            return this.serializeDocument(document, file.filename);
+            this.pipeline.scheduleProcessing(document.id);
+            return this.serializeDocument({ ...document, status: client_1.DocumentStatus.PROCESSING }, file.filename);
         }
         catch (err) {
             this.logger.error('Failed to save document metadata', err);
@@ -78,12 +87,10 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
     }
     async findAll(query) {
         const where = {};
-        if (query.userId) {
+        if (query.userId)
             where['userId'] = query.userId;
-        }
-        if (query.fileType) {
+        if (query.fileType)
             where['fileType'] = query.fileType;
-        }
         const documents = await this.prisma.document.findMany({
             where,
             orderBy: { uploadedAt: 'desc' },
@@ -95,34 +102,66 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
         if (!document) {
             throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
         }
-        if (document.extractedText) {
-            this.logger.log(`Using existing extracted text for document: ${id}`);
+        const text = document.processedContent ??
+            document.extractedText ??
+            document.rawText;
+        if (text) {
             return {
-                text: document.extractedText,
-                charCount: document.extractedText.length,
-                lineCount: document.extractedText.split('\n').length,
-                sourceType: document.fileName.endsWith('.pdf') ? 'pdf' : 'docx'
+                text,
+                charCount: text.length,
+                lineCount: text.split('\n').length,
+                sourceType: document.fileName.endsWith('.pdf') ? 'pdf' : 'docx',
             };
         }
         const result = await this.textExtractor.extract(document.filePath, document.fileName);
         await this.prisma.document.update({
             where: { id },
-            data: { extractedText: result.text },
+            data: { extractedText: result.text, rawText: result.text },
         });
         return result;
     }
     async findOne(id) {
-        const document = await this.prisma.document.findUnique({
-            where: { id },
-        });
+        const document = await this.prisma.document.findUnique({ where: { id } });
         if (!document) {
             throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
         }
         return this.serializeDocument(document);
     }
+    async getAiAnalysis(id) {
+        const document = await this.prisma.document.findUnique({ where: { id } });
+        if (!document) {
+            throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
+        }
+        return document.aiAnalysis ?? null;
+    }
+    async getProcessingStatus(id) {
+        const document = await this.prisma.document.findUnique({ where: { id } });
+        if (!document) {
+            throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
+        }
+        return {
+            status: document.status,
+            documentType: document.documentType,
+            aiSource: document.aiSource,
+            processingMs: document.processingMs,
+            processingError: document.processingError,
+            processedAt: document.processedAt,
+            hasAiAnalysis: document.aiAnalysis != null,
+        };
+    }
+    async reprocess(id, forceAi = false) {
+        const document = await this.prisma.document.findUnique({ where: { id } });
+        if (!document) {
+            throw new common_1.NotFoundException(`Document với id "${id}" không tồn tại`);
+        }
+        await this.pipeline.runPipeline(id, forceAi);
+        return this.findOne(id);
+    }
     serializeDocument(doc, storedFilename) {
-        const filename = storedFilename ?? doc.filePath?.split(/[\\/]/).pop() ?? '';
+        const filePath = doc.filePath;
+        const filename = storedFilename ?? filePath?.split(/[\\/]/).pop() ?? '';
         const baseUrl = process.env.BASE_URL ?? 'http://localhost:3000';
+        const aiAnalysis = doc.aiAnalysis;
         return {
             id: doc.id,
             userId: doc.userId,
@@ -132,7 +171,23 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
             fileSizeFormatted: this.formatBytes(Number(doc.fileSize)),
             url: `${baseUrl}/api/documents/files/${filename}`,
             uploadedAt: doc.uploadedAt,
+            status: doc.status ?? client_1.DocumentStatus.READY,
+            documentType: doc.documentType ?? null,
+            aiSource: doc.aiSource ?? null,
+            processingError: doc.processingError ?? null,
+            processedAt: doc.processedAt ?? null,
+            hasAiAnalysis: aiAnalysis != null,
+            previewText: this.previewText(doc),
+            aiAnalysis: aiAnalysis ?? null,
         };
+    }
+    previewText(doc) {
+        const content = doc.processedContent ??
+            doc.extractedText ??
+            doc.rawText;
+        if (!content)
+            return null;
+        return content.length > 2000 ? `${content.slice(0, 2000)}…` : content;
     }
     formatBytes(bytes) {
         if (bytes < 1024)
@@ -145,9 +200,10 @@ let DocumentsService = DocumentsService_1 = class DocumentsService {
 exports.DocumentsService = DocumentsService;
 exports.DocumentsService = DocumentsService = DocumentsService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __param(2, (0, common_1.Inject)('RABBITMQ_CLIENT')),
+    __param(3, (0, common_1.Inject)('RABBITMQ_CLIENT')),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         text_extractor_service_1.TextExtractorService,
+        document_pipeline_service_1.DocumentPipelineService,
         microservices_1.ClientProxy])
 ], DocumentsService);
 //# sourceMappingURL=documents.service.js.map

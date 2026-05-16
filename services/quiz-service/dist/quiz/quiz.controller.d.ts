@@ -24,14 +24,14 @@ export declare class QuizController {
             total: number;
         };
     }>;
-    generateQuiz(dto: GenerateQuizDto): Promise<{
+    generateQuiz(userId: string, dto: GenerateQuizDto): Promise<{
         questions: {
             id: string;
+            quizId: string;
             questionText: string;
             options: import("@prisma/client/runtime/library").JsonValue;
             correctAnswer: string;
             explanation: string | null;
-            quizId: string;
         }[];
     } & {
         id: string;
@@ -45,6 +45,7 @@ export declare class QuizController {
             id: string;
             questionText: string;
             options: import("@prisma/client/runtime/library").JsonValue;
+            correctAnswer: string;
         }[];
     } & {
         id: string;
@@ -62,6 +63,9 @@ export declare class QuizController {
         total: number;
         answers: import("@prisma/client/runtime/library").JsonValue;
     }>;
+    deleteQuiz(id: string): Promise<{
+        success: boolean;
+    }>;
     listFlashcards(userId: string, documentId?: string): Promise<{
         id: string;
         documentId: string;
@@ -70,7 +74,14 @@ export declare class QuizController {
         front: string;
         back: string;
     }[]>;
-    generateFlashcards(userId: string, documentId: string): Promise<any[]>;
+    generateFlashcards(userId: string, documentId: string): Promise<{
+        id: string;
+        documentId: string;
+        createdAt: Date;
+        userId: string;
+        front: string;
+        back: string;
+    }[]>;
     deleteFlashcard(userId: string, id: string): Promise<{
         success: boolean;
     }>;

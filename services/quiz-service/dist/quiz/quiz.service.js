@@ -14,96 +14,147 @@ exports.QuizService = void 0;
 const common_1 = require("@nestjs/common");
 const prisma_service_1 = require("../prisma/prisma.service");
 const config_1 = require("@nestjs/config");
-const generative_ai_1 = require("@google/generative-ai");
-const axios_1 = require("axios");
-const axios_2 = require("@nestjs/axios");
+const axios_1 = require("@nestjs/axios");
 const rxjs_1 = require("rxjs");
+const document_analysis_client_1 = require("./document-analysis.client");
+const rule_based_generator_1 = require("./rule-based-generator");
+const generative_ai_1 = require("@google/generative-ai");
 let QuizService = QuizService_1 = class QuizService {
-    constructor(prisma, configService, httpService) {
+    constructor(prisma, configService, httpService, documentClient) {
         this.prisma = prisma;
         this.configService = configService;
         this.httpService = httpService;
+        this.documentClient = documentClient;
         this.logger = new common_1.Logger(QuizService_1.name);
+        this.genAI = null;
         const apiKey = this.configService.get('GEMINI_API_KEY');
-        if (!apiKey) {
-            this.genAI = null;
-        }
-        else {
+        if (apiKey) {
             this.genAI = new generative_ai_1.GoogleGenerativeAI(apiKey);
         }
     }
-    async generateQuiz(documentId) {
-        let summaryText = '';
-        try {
-            const summaryServiceUrl = this.configService.get('SUMMARY_SERVICE_URL') ||
-                'http://localhost:3006';
-            const response = await axios_1.default.get(`${summaryServiceUrl}/api/summaries/document/${documentId}`);
-            if (response.data && response.data.success && response.data.data && response.data.data.content) {
-                summaryText = response.data.data.content;
-            }
-            else {
-                throw new Error('Summary content not found in response');
-            }
-        }
-        catch (error) {
-            console.error('Error fetching summary:', error.message);
-            throw new common_1.NotFoundException(`Summary for document ${documentId} not found`);
-        }
-        if (!this.genAI) {
-            throw new common_1.InternalServerErrorException('GEMINI_API_KEY is missing. Please add it to your .env file to enable quiz generation.');
-        }
-        let questions = [];
-        try {
-            const modelName = this.configService.get('GEMINI_MODEL') || 'gemini-2.5-flash';
-            const model = this.genAI.getGenerativeModel({ model: modelName });
-            const prompt = `
-        Based on this English learning material summary, generate 5 multiple-choice questions.
-        Focus on: vocabulary, grammar, reading comprehension, or TOEIC/IELTS-style items.
-        Mix question types across the set. Questions in English; explanations in Vietnamese.
-
-        Each object:
-        - questionText: string (English)
-        - options: string[] (4 options in English)
-        - correctAnswer: string (exact match to one option)
-        - explanation: string (Vietnamese, why correct)
-
-        Summary:
-        ${summaryText}
-
-        Return ONLY the JSON array.
-      `;
-            const result = await model.generateContent(prompt);
-            const text = result.response.text();
-            const jsonStr = text.replace(/```json\n|\n```|```/g, '').trim();
-            questions = JSON.parse(jsonStr);
-        }
-        catch (error) {
-            console.error('AI generation failed:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to generate quiz questions');
-        }
-        try {
-            const quiz = await this.prisma.quiz.create({
-                data: {
-                    documentId,
-                    title: `English Quiz - ${documentId.slice(0, 8)}`,
-                    questions: {
-                        create: questions.map((q) => ({
-                            questionText: q.questionText,
-                            options: q.options,
-                            correctAnswer: q.correctAnswer,
-                            explanation: q.explanation,
-                        })),
-                    },
-                },
-                include: {
-                    questions: true,
-                },
-            });
+    async generateQuiz(documentId, userId) {
+        let quiz = await this.prisma.quiz.findFirst({
+            where: { documentId },
+            include: { questions: true },
+        });
+        if (quiz && quiz.questions.length > 0) {
             return quiz;
         }
-        catch (error) {
-            console.error('Error saving quiz:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to save quiz to database');
+        await this.generateAndCacheBoth(documentId, userId);
+        quiz = await this.prisma.quiz.findFirst({
+            where: { documentId },
+            include: { questions: true },
+        });
+        if (!quiz || quiz.questions.length === 0) {
+            throw new common_1.BadRequestException('Không thể tạo quiz từ tài liệu này.');
+        }
+        return quiz;
+    }
+    async generateFlashcards(documentId, userId) {
+        let cards = await this.prisma.flashcard.findMany({
+            where: { documentId, userId },
+        });
+        if (cards.length > 0) {
+            return cards;
+        }
+        await this.generateAndCacheBoth(documentId, userId);
+        cards = await this.prisma.flashcard.findMany({
+            where: { documentId, userId },
+        });
+        if (cards.length === 0) {
+            throw new common_1.BadRequestException('Không thể tạo flashcard từ tài liệu này.');
+        }
+        return cards;
+    }
+    async generateAndCacheBoth(documentId, userId) {
+        this.logger.log(`[one-pass-ai] Bắt đầu xử lý gộp cho document=${documentId}`);
+        const text = await this.documentClient.fetchDocumentText(documentId);
+        if (!text?.trim()) {
+            throw new common_1.NotFoundException(`Tài liệu ${documentId} chưa sẵn sàng. Đợi trạng thái READY hoặc tải lại file.`);
+        }
+        let result;
+        if (this.genAI) {
+            try {
+                const modelName = this.configService.get('GEMINI_MODEL') || 'gemini-2.5-flash';
+                const model = this.genAI.getGenerativeModel({ model: modelName });
+                const prompt = `Bạn là chuyên gia giáo dục. Hãy đọc tài liệu dưới đây và tạo ra:
+1. Một bộ Quiz 10 câu hỏi trắc nghiệm (về từ vựng, ngữ pháp, ý chính).
+2. Một bộ 12 thẻ Flashcard (mặt trước là khái niệm/từ vựng tiếng Anh, mặt sau là giải nghĩa tiếng Việt).
+
+Tài liệu:
+"""
+${text.slice(0, 15000)}
+"""
+
+CHỈ trả về kết quả dưới định dạng JSON hợp lệ (không chứa ký tự markdown như \`\`\`json), với cấu trúc chính xác như sau:
+{
+  "questions": [
+    { "questionText": "...", "options": ["...", "...", "...", "..."], "correctAnswer": "ghi chính xác nội dung text của đáp án đúng, KHÔNG dùng A B C D", "explanation": "..." }
+  ],
+  "flashcards": [
+    { "front": "...", "back": "..." }
+  ]
+}
+`;
+                const response = await model.generateContent(prompt);
+                let rawText = response.response.text().trim();
+                if (rawText.startsWith('```json')) {
+                    rawText = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+                }
+                result = JSON.parse(rawText);
+                this.logger.log(`[one-pass-ai] Gemini thành công cho document=${documentId}`);
+            }
+            catch (err) {
+                this.logger.error(`[one-pass-ai] Gemini failed: ${err.message}. Fallback to local.`);
+                result = (0, rule_based_generator_1.buildAnalysisFromText)(text);
+            }
+        }
+        else {
+            this.logger.warn(`[one-pass-ai] Không có GEMINI_API_KEY. Dùng local.`);
+            result = (0, rule_based_generator_1.buildAnalysisFromText)(text);
+        }
+        const questions = result.questions?.slice(0, 10) ?? [];
+        if (questions.length > 0) {
+            const existingQuiz = await this.prisma.quiz.findFirst({ where: { documentId } });
+            if (!existingQuiz) {
+                await this.prisma.quiz.create({
+                    data: {
+                        documentId,
+                        title: `Quiz - ${documentId.slice(0, 8)}`,
+                        questions: {
+                            create: questions.map((q) => {
+                                let correct = q.correctAnswer;
+                                if (correct && /^[A-D]$/i.test(correct.trim())) {
+                                    const idx = correct.trim().toUpperCase().charCodeAt(0) - 65;
+                                    if (q.options && idx >= 0 && idx < q.options.length) {
+                                        correct = q.options[idx];
+                                    }
+                                }
+                                return {
+                                    questionText: q.questionText,
+                                    options: q.options,
+                                    correctAnswer: correct,
+                                    explanation: q.explanation || '',
+                                };
+                            }),
+                        },
+                    },
+                });
+            }
+        }
+        const flashcards = result.flashcards?.slice(0, 12) ?? [];
+        if (flashcards.length > 0 && userId) {
+            const existingCards = await this.prisma.flashcard.count({ where: { documentId, userId } });
+            if (existingCards === 0) {
+                await Promise.all(flashcards.map((card) => this.prisma.flashcard.create({
+                    data: {
+                        documentId,
+                        userId,
+                        front: card.front,
+                        back: card.back,
+                    },
+                })));
+            }
         }
     }
     async getQuiz(id) {
@@ -115,178 +166,78 @@ let QuizService = QuizService_1 = class QuizService {
                         id: true,
                         questionText: true,
                         options: true,
-                    }
-                }
-            }
+                        correctAnswer: true,
+                    },
+                },
+            },
         });
-        if (!quiz) {
+        if (!quiz)
             throw new common_1.NotFoundException(`Quiz ${id} not found`);
-        }
         return quiz;
     }
     async listQuizzes(userId, skip = 0, take = 10) {
-        try {
-            const quizzes = await this.prisma.quiz.findMany({
-                skip,
-                take,
-                include: {
-                    questions: {
-                        select: {
-                            id: true,
-                            questionText: true,
-                            options: true,
-                        },
-                    },
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            });
-            const total = await this.prisma.quiz.count();
-            return {
-                data: quizzes,
-                pagination: {
-                    skip,
-                    take,
-                    total,
-                },
-            };
-        }
-        catch (error) {
-            console.error('Error listing quizzes:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to list quizzes');
-        }
+        const quizzes = await this.prisma.quiz.findMany({
+            skip, take,
+            include: { questions: { select: { id: true, questionText: true, options: true } } },
+            orderBy: { createdAt: 'desc' },
+        });
+        const total = await this.prisma.quiz.count();
+        return { data: quizzes, pagination: { skip, take, total } };
+    }
+    async deleteQuiz(id) {
+        const quiz = await this.prisma.quiz.findUnique({ where: { id } });
+        if (!quiz)
+            throw new common_1.NotFoundException('Quiz not found');
+        await this.prisma.$transaction([
+            this.prisma.quizAttempt.deleteMany({ where: { quizId: id } }),
+            this.prisma.question.deleteMany({ where: { quizId: id } }),
+            this.prisma.quiz.delete({ where: { id } }),
+        ]);
+        return { success: true };
     }
     async submitQuiz(quizId, userId, answers) {
         const quiz = await this.prisma.quiz.findUnique({
             where: { id: quizId },
             include: { questions: true },
         });
-        if (!quiz) {
+        if (!quiz)
             throw new common_1.NotFoundException(`Quiz ${quizId} not found`);
-        }
         let score = 0;
         const total = quiz.questions.length;
         for (const q of quiz.questions) {
-            if (answers[q.id] === q.correctAnswer) {
+            if (answers[q.id] === q.correctAnswer)
                 score++;
-            }
         }
-        try {
-            const attempt = await this.prisma.quizAttempt.create({
-                data: {
-                    quizId,
-                    userId,
-                    score,
-                    total,
-                    answers,
-                },
-            });
-            this.notifyDashboardOfQuizCompleted(userId, quizId, score, total);
-            return attempt;
-        }
-        catch (error) {
-            console.error('Error saving quiz attempt:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to save quiz attempt');
-        }
-    }
-    async generateFlashcards(documentId, userId) {
-        let summaryText = '';
-        try {
-            const summaryServiceUrl = this.configService.get('SUMMARY_SERVICE_URL') ||
-                'http://localhost:3006';
-            const response = await axios_1.default.get(`${summaryServiceUrl}/api/summaries/document/${documentId}`);
-            summaryText =
-                response.data?.data?.content ||
-                    response.data?.summary ||
-                    response.data?.content ||
-                    '';
-            if (!summaryText) {
-                throw new Error('Summary content not found');
-            }
-        }
-        catch (error) {
-            console.error('Error fetching summary for flashcards:', error.message);
-            throw new common_1.NotFoundException(`Summary for document ${documentId} not found`);
-        }
-        if (!this.genAI) {
-            throw new common_1.InternalServerErrorException('GEMINI_API_KEY is missing.');
-        }
-        try {
-            const modelName = this.configService.get('GEMINI_MODEL') || 'gemini-2.5-flash';
-            const model = this.genAI.getGenerativeModel({ model: modelName });
-            const prompt = `
-        Từ tóm tắt tài liệu học tiếng Anh sau, tạo 6-8 flashcards từ vựng/ngữ pháp.
-
-        Mỗi flashcard:
-        - front: từ/cụm tiếng Anh (word or phrase)
-        - back: định dạng nhiều dòng tiếng Việt:
-          Nghĩa: [nghĩa tiếng Việt]
-          Ví dụ: [câu ví dụ tiếng Anh]
-          Phát âm/Ghi chú: [IPA hoặc ghi chú ngắn nếu có, hoặc "—"]
-
-        Tóm tắt:
-        ${summaryText}
-
-        Trả về DUY NHẤT JSON array [{"front":"...","back":"..."}], không Markdown.
-      `;
-            const result = await model.generateContent(prompt);
-            const text = result.response.text();
-            const jsonStr = text.replace(/```json\n|\n```|```/g, '').trim();
-            const cards = JSON.parse(jsonStr);
-            const savedCards = await Promise.all(cards.map((card) => this.prisma.flashcard.create({
-                data: {
-                    documentId,
-                    userId,
-                    front: card.front,
-                    back: card.back,
-                },
-            })));
-            return savedCards;
-        }
-        catch (error) {
-            console.error('Flashcard generation failed:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to generate flashcards using AI');
-        }
+        const attempt = await this.prisma.quizAttempt.create({
+            data: { quizId, userId, score, total, answers },
+        });
+        this.notifyDashboardOfQuizCompleted(userId, quizId, score, total);
+        return attempt;
     }
     async listFlashcards(userId, documentId) {
-        try {
-            return await this.prisma.flashcard.findMany({
-                where: {
-                    userId,
-                    ...(documentId && { documentId }),
-                },
-                orderBy: {
-                    createdAt: 'desc',
-                },
-            });
-        }
-        catch (error) {
-            console.error('Error listing flashcards:', error.message);
-            throw new common_1.InternalServerErrorException('Failed to fetch flashcards');
-        }
+        return this.prisma.flashcard.findMany({
+            where: { userId, ...(documentId && { documentId }) },
+            orderBy: { createdAt: 'desc' },
+        });
     }
     async deleteFlashcard(userId, id) {
         const card = await this.prisma.flashcard.findUnique({ where: { id } });
-        if (!card || card.userId !== userId) {
+        if (!card || card.userId !== userId)
             throw new common_1.NotFoundException('Flashcard not found');
-        }
         await this.prisma.flashcard.delete({ where: { id } });
         return { success: true };
     }
     async notifyDashboardOfQuizCompleted(userId, quizId, score, total) {
         try {
-            const dashboardServiceUrl = this.configService.get('DASHBOARD_SERVICE_URL') || 'http://localhost:3002';
-            await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${dashboardServiceUrl}/api/dashboard/events/quiz-completed`, {
-                user_id: userId,
-                quiz_id: quizId,
+            const url = this.configService.get('DASHBOARD_SERVICE_URL') || 'http://localhost:3002';
+            await (0, rxjs_1.firstValueFrom)(this.httpService.post(`${url}/api/dashboard/events/quiz-completed`, {
+                user_id: userId, quiz_id: quizId,
                 score: Math.round((score / total) * 100),
                 occurred_at: new Date().toISOString(),
             }));
-            this.logger.log(`Notified Dashboard of quiz completion for user ${userId}`);
         }
         catch (err) {
-            console.error(`Failed to notify Dashboard of quiz completion: ${err.message}`);
+            this.logger.warn(`Dashboard notify failed: ${err.message}`);
         }
     }
 };
@@ -295,6 +246,7 @@ exports.QuizService = QuizService = QuizService_1 = __decorate([
     (0, common_1.Injectable)(),
     __metadata("design:paramtypes", [prisma_service_1.PrismaService,
         config_1.ConfigService,
-        axios_2.HttpService])
+        axios_1.HttpService,
+        document_analysis_client_1.DocumentAnalysisClient])
 ], QuizService);
 //# sourceMappingURL=quiz.service.js.map

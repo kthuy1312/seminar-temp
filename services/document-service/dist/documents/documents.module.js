@@ -13,6 +13,8 @@ const documents_controller_1 = require("./documents.controller");
 const documents_service_1 = require("./documents.service");
 const text_extractor_service_1 = require("./text-extractor.service");
 const prisma_service_1 = require("../prisma/prisma.service");
+const document_pipeline_service_1 = require("../processing/document-pipeline.service");
+const ai_analysis_service_1 = require("../processing/ai-analysis.service");
 let DocumentsModule = class DocumentsModule {
 };
 exports.DocumentsModule = DocumentsModule;
@@ -26,15 +28,19 @@ exports.DocumentsModule = DocumentsModule = __decorate([
                     options: {
                         urls: [process.env.RABBITMQ_URL || 'amqp://localhost:5672'],
                         queue: 'document_events_queue',
-                        queueOptions: {
-                            durable: true,
-                        },
+                        queueOptions: { durable: true },
                     },
                 },
             ]),
         ],
         controllers: [documents_controller_1.DocumentsController],
-        providers: [documents_service_1.DocumentsService, text_extractor_service_1.TextExtractorService, prisma_service_1.PrismaService],
+        providers: [
+            documents_service_1.DocumentsService,
+            text_extractor_service_1.TextExtractorService,
+            prisma_service_1.PrismaService,
+            ai_analysis_service_1.AiAnalysisService,
+            document_pipeline_service_1.DocumentPipelineService,
+        ],
         exports: [documents_service_1.DocumentsService],
     })
 ], DocumentsModule);

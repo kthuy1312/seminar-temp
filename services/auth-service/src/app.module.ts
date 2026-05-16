@@ -24,7 +24,7 @@ import configuration from './config/configuration';
         database: configService.get<string>('database.name'),
         entities: [User, RefreshToken],
         synchronize: configService.get<string>('nodeEnv') === 'development',
-        logging: configService.get<string>('nodeEnv') === 'development',
+        logging: configService.get<string>('nodeEnv') === 'development' ? ['error', 'warn'] : false,
       }),
     }),
     AuthModule,

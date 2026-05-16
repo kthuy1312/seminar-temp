@@ -13,13 +13,37 @@
 #   tutor-service : 3007
 # ============================================================
 
-$root = Split-Path -Parent $MyInvocation.MyCommand.Path
+$root = (Get-Item $MyInvocation.MyCommand.Path).Directory.Parent.FullName
+
+$servicePaths = @(
+    "$root\services\auth-service",
+    "$root\services\dashboard-service",
+    "$root\services\document-service",
+    "$root\services\goal-service",
+    "$root\services\quiz-service",
+    "$root\services\summary-service",
+    "$root\services\tutor-service",
+    "$root\services\api-gateway"
+)
+
+# Stale tsconfig.tsbuildinfo at service root breaks incremental emit after Nest deletes dist/
+Write-Host "Clearing stale TypeScript build caches..." -ForegroundColor Yellow
+foreach ($path in $servicePaths) {
+    $stale = Join-Path $path "tsconfig.tsbuildinfo"
+    if (Test-Path $stale) {
+        Remove-Item $stale -Force
+        Write-Host "  removed $stale" -ForegroundColor DarkGray
+    }
+}
+Write-Host ""
 
 function Start-Service($name, $path, $cmd) {
     Write-Host "▶ Starting $name..." -ForegroundColor Cyan
     Start-Process powershell -ArgumentList "-NoExit", "-Command", "cd '$path'; $cmd" -WindowStyle Normal
     Start-Sleep -Milliseconds 500
 }
+
+
 
 # 1. Microservices (start in parallel)
 Start-Service "auth-service"      "$root\services\auth-service"      "npm run start:dev"
@@ -44,9 +68,9 @@ Start-Sleep -Seconds 8
 Start-Service "frontend"          "$root\frontend"                    "npm run dev"
 
 Write-Host ""
-Write-Host "✅ All services started!" -ForegroundColor Green
-Write-Host "   Frontend  → http://localhost:3100"
-Write-Host "   Gateway   → http://localhost:3000"
+Write-Host '✅ All services started!' -ForegroundColor Green
+Write-Host '   Frontend  → http://localhost:3100'
+Write-Host '   Gateway   → http://localhost:3000'
 Write-Host ""
-Write-Host "📋 Password requirements: min 6 chars, 1 uppercase, 1 lowercase, 1 number"
-Write-Host "   Example: Test1234"
+Write-Host '📋 Password requirements: min 6 chars, 1 uppercase, 1 lowercase, 1 number'
+Write-Host '   Example: Test1234'

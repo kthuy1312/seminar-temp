@@ -12,22 +12,33 @@ export declare class TutorService {
     askQuestion(askDto: AskDto): Promise<{
         conversationId: any;
         answer: string;
+        fallback: boolean;
+        fallbackHint: string;
+        model: string;
+    } | {
+        conversationId: string;
+        answer: string;
+        fallback: boolean;
+        fallbackHint?: undefined;
+        model?: undefined;
     }>;
     private getDocumentContext;
     private getDocumentText;
     private getSummaryOptional;
+    private selectChunks;
     private truncateText;
     private generateAnswer;
+    private buildFallbackAnswer;
     getHistory(userId: string, documentId?: string, skip?: number, take?: number): Promise<{
         data: {
             conversationId: string;
             documentId: string;
             messages: {
+                conversationId: string;
                 id: string;
+                createdAt: Date;
                 role: string;
                 content: string;
-                createdAt: Date;
-                conversationId: string;
             }[];
         }[];
         pagination: {
