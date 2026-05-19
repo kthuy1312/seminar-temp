@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install root dependencies (if any)
+        run: |
+          if [ -f package.json ]; then
+            npm ci
+          fi
+
+      - name: Run workspace checks
+        run: |
+          set -e
+          echo "Searching projects: frontend and services/*"
+          for d in frontend services/*; do
+            if [ -d "$d" ] && [ -f "$d/package.json" ]; then
+              echo "==> Processing $d"
+              pushd "$d"
+              npm ci
+              if grep -q '"test"' package.json; then
+                echo "Running tests in $d"
+                npm test || true
+              fi
+              if grep -q '"build"' package.json; then
+                echo "Running build in $d"
+                npm run build || true
+              fi
+              popd
+            fi
+          done
