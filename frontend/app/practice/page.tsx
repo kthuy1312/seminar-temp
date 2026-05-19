@@ -81,10 +81,10 @@ function PracticeContent() {
           </div>
         )}
 
-        {!documentId && documents.length > 0 && (
+        {documents.length > 0 && (
           <div className="relative z-10 mt-4 max-w-md">
             <select
-              value=""
+              value={documentId ?? ""}
               onChange={handleDocumentSelect}
               className="w-full rounded-xl border-0 bg-white px-4 py-3 text-sm text-slate-900 font-medium shadow-sm focus:ring-2 focus:ring-orange-300 outline-none cursor-pointer"
             >

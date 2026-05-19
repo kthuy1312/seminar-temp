@@ -261,8 +261,10 @@ CHỈ trả về kết quả dưới định dạng JSON hợp lệ (không ch�
       const url = this.configService.get<string>('DASHBOARD_SERVICE_URL') || 'http://localhost:3002';
       await firstValueFrom(
         this.httpService.post(`${url}/api/dashboard/events/quiz-completed`, {
-          user_id: userId, quiz_id: quizId,
+          user_id: userId,
+          quiz_id: quizId,
           score: Math.round((score / total) * 100),
+          total_questions: total,
           occurred_at: new Date().toISOString(),
         })
       );
